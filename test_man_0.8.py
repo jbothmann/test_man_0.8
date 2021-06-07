@@ -104,8 +104,15 @@ class Test:
     #a separate tuple array to keep track of all comments in chronological order
     allComments = []
 
+    #station status constants
+    NORMAL = "In Progress"
+    IN_PROGRESS = NORMAL
+    PAUSED = "Paused"
+    STOPPED = "Stopped"
+    OFFLINE = "Offline"
+
     #Constructor which creates a test with expandable data
-    def __init__(self, address=-1, name="[test name]", serial="[serial number]", data=None, controlLabels=None):
+    def __init__(self, address=-1, name="[test name]", serial="[serial number]", data=None, controls=None):
         global dataFrame
         try:
             self.testNum = int(address) #Slave PLC address
@@ -114,8 +121,8 @@ class Test:
 
         self.id = ''.join(random.choice(string.ascii_letters+string.digits) for ii in range(16)) #unique identifying string used by the API #TODO: does this need to be unique garunteed?
 
-        self.name = name #Should include name of unit, and test type, should be identifiably unique
-        self.serial = serial #subtitle for the  of the unit
+        self.name = name #title of the station, should include name of unit and test type, should be identifiably unique
+        self.serial = serial #subtitle for the station
         self.status = "Offline"
         self.data = [] #data variables, a len 32 list of 4-lists, including a string defining the datum, a string defining the units, the number datum, and a boolean which determines if the datum is used
         #repair passed data if it is unsuitable or absent
@@ -147,17 +154,21 @@ class Test:
                 elif isinstance(data[ii], str):
                     self.data[ii][0] = data[ii] #set datum name if only a string name is given
                     self.data[ii][3] = True #assume the data is used if it has a name
+
         #repair passed label if it is unsuitable or absent
-        self.controlLabels = [] #control labels, a len 32 list of strings, which communicate what each control does
-        if not isinstance(controlLabels, list):
-            controlLabels = []
-        #handle given labels, ensuring that each entry is a character string
+        self.controls = [] #controls, a len 32 list of 2-lists, including a string name which communicates what each control does, and a boolean value
+        if not isinstance(controls, list):
+            controls = []
+        #handle given labels, ensuring that each entry is a proper 2-list string
         for ii in range(numberOfControls):
-            self.controlLabels.append("")
-            if ii < len(controlLabels):
-                if isinstance(controlLabels[ii], str):
-                    self.controlLabels[ii] = controlLabels[ii]
-                    
+            self.controls.append(["", False])
+            if ii < len(controls):
+                if isinstance(controls[ii], list):
+                    if len(controls[ii]) > 0:
+                        if isinstance(controls[ii][0], str):
+                            self.controls[ii][0] = controls[ii][0] #set control label, string
+                elif isinstance(controls[ii], str):
+                    self.controls[ii][0] = controls[ii] #set control label if only a string name is given     
 
         self.comments = [] #tuple list of additional notes, including error modes and manual measurements
         #contains a string representing time of report, and a string phrase description
@@ -219,15 +230,19 @@ class Test:
     def updateLabel(self):
         global root
         self.dataLabel.config(text=self.toString())
-        if self.status == "In Progress":
+        if self.status == Test.NORMAL:
             self.statusIndicator.config(text="\U00002B24   In Progress", fg="green")
             self.button1.config(text="Pause", command=lambda: pause(self.testNum), state=NORMAL)
             self.button2.config(text="More Controls", command=lambda: openControls(self.testNum), state=NORMAL)
-        elif self.status == "Paused":
+        elif self.status == Test.PAUSED:
             self.statusIndicator.config(text="\U00002B24   Paused", fg=T.fg)
             self.button1.config(text="Resume", command=lambda: resume(self.testNum), state=NORMAL)
             self.button2.config(text="More Controls", command=lambda: openControls(self.testNum), state=NORMAL)
-        elif self.status == "Offline":
+        elif self.status == Test.STOPPED:
+            self.statusIndicator.config(text="\U00002B24   Stopped", fg="orange")
+            self.button1.config(text="Pause", state=DISABLED)
+            self.button2.config(text="More Controls", command=lambda: openControls(self.testNum), state=NORMAL)
+        elif self.status == Test.OFFLINE:
             self.statusIndicator.config(text="\U00002B24   Offline", fg="red")
             self.button1.config(text="Pause", state=DISABLED)
             self.button2.config(text="More Controls", state=DISABLED)
@@ -254,23 +269,23 @@ class Test:
 
     #four methods for updating the test's status, which will also update the datalabel:
     def setNormal(self):
-        if not self.status == "In Progress":
-            self.status = "In Progress"
+        if not self.status == Test.NORMAL:
+            self.status = Test.NORMAL
             self.updateLabel()
 
     def setPaused(self):
-        if not self.status == "Paused":
-            self.status = "Paused"
+        if not self.status == Test.PAUSED:
+            self.status = Test.PAUSED
             self.updateLabel()
 
     def setStopped(self): #unused state
-        if not self.status == "Stopped":
-            self.status = "Stopped"
+        if not self.status == Test.STOPPED:
+            self.status = Test.STOPPED
             self.updateLabel()
 
     def setOffline(self):
-        if not self.status == "Offline":
-            self.status = "Offline"
+        if not self.status == Test.OFFLINE:
+            self.status = Test.OFFLINE
             self.updateLabel()
 
     #appends a new comment to the test
@@ -304,7 +319,12 @@ class Test:
     def setControlLabels(self, newLabels):
         for ii in range(len(newLabels)):
             if isinstance(newLabels[ii], str):
-                self.controlLabels[ii] = newLabels[ii]
+                self.controls[ii][0] = newLabels[ii]
+
+    def setControlStatus(self, newStatus):
+        for ii in range(len(newStatus)):
+            if isinstance(newStatus[ii], bool):
+                self.controls[ii][1] = newStatus[ii]
             
 #list which holds the array of tests, currently begins empty
 tests = []
@@ -430,7 +450,7 @@ def saveSession():
                         "show":oo.data[ii][3]
                         } for ii in range(numberOfData)],
 
-                    "controls":[{"name":oo.controlLabels[ii]} for ii in range(numberOfControls)]
+                    "controls":[{"name":oo.controls[ii][0]} for ii in range(numberOfControls)]
                     })
             json.dump(testList, file)
     finally:
@@ -448,7 +468,6 @@ def openSession():
             testList = json.load(file)
             try:
                 for oo in testList:
-                
                     tests.append(Test(
                         oo["number"], 
                         oo["title"], 
@@ -474,7 +493,7 @@ def openSession():
             file.close()
         update()
         
-def connect():
+def connect():  #TODO: Indicate when the program is connected, and add the ability to disconnect
     global ser
     #setup the new menu
     connector = T.apply(Toplevel())
@@ -1317,7 +1336,7 @@ def editControls(initialTestNum=0):
 
     def save():
         for ii in range(numberOfControls):
-            tests[currentTestIndex].controlLabels[ii] = controlNameEntries[ii].get()
+            tests[currentTestIndex].controls[ii][0] = controlNameEntries[ii].get()
         #update()
 
     def apply():
@@ -1342,7 +1361,7 @@ def editControls(initialTestNum=0):
             for ii in range(numberOfControls):
                 controlNameEntries[ii].config(state=NORMAL)
                 controlNameEntries[ii].delete(0, END)
-                controlNameEntries[ii].insert(0, tests[currentTestIndex].controlLabels[ii])
+                controlNameEntries[ii].insert(0, tests[currentTestIndex].controls[ii])
         else:
             dropdown.config(text=("Choose a station to edit \U000025BC"))
             for ii in range(numberOfControls):
@@ -1438,17 +1457,15 @@ def openControls(InitialTestNum=0):
         currentTestIndex=testIndex
         if (currentTestIndex>=0): 
             dropdown.config(text=("Station "+str(tests[testIndex].testNum)+": "+tests[testIndex].name+" \U000025BC"))
-            for ii in range(numberOfControls):
-                controlNameLabels[ii].config(text=tests[currentTestIndex].controlLabels[ii])
 
             retryCount = 0
             done = False
             while not done:  #If the data retrieval is unsuccessful, Try three times before showing that the PLC is offline
-                retSuccess, newData = retrieveControlStatus(tests[currentTestIndex].testNum)
                 if retSuccess:  #The data retrieval has been successful.  Exit the loop and populate controls with current data
                     done = True
+                    tests[currentTestIndex].setControlStatus(newControlStatus)
                     for ii in range(numberOfControls):
-                        if newData[ii]:         
+                        if newControlStatus[ii]:         
                             controlButtons[ii].config(text="ON", fg="green", state=NORMAL, command=lambda x=ii: sendCommand(x+1, 0))
                         else:
                             controlButtons[ii].config(text="OFF", fg=T.fg, state=NORMAL, command=lambda x=ii: sendCommand(x+1, 1))
@@ -1457,8 +1474,20 @@ def openControls(InitialTestNum=0):
 
                 if retryCount >= 3:  #The data retrieval has been unsuccessful three times.  Exit the loop and show controls offline
                     done = True
+                    tests[currentTestIndex].setOffline()
                     for ii in range(numberOfControls):
                         controlButtons[ii].config(text="OFFLINE", fg=T.fg, state=DISABLED, command=None)
+
+            for ii in range(numberOfControls):
+                controlNameLabels[ii].config(text=tests[currentTestIndex].controls[ii][0])
+                if tests[currentTestIndex].status == Test.OFFLINE:
+                    controlButtons[ii].config(text="OFFLINE", fg=T.fg, state=DISABLED, command=None)
+                else:
+                    if tests[currentTestIndex].controls[ii][1]:
+                        controlButtons[ii].config(text="ON", fg="green", state=NORMAL, command=lambda x=ii: sendCommand(x+1, 0))
+                    else:
+                        controlButtons[ii].config(text="OFF", fg=T.fg, state=NORMAL, command=lambda x=ii: sendCommand(x+1, 1))                
+                        
         else:
             dropdown.config(text=("Choose a station to control \U000025BC"))
             for ii in range(numberOfControls):
@@ -1553,19 +1582,32 @@ def pauseTests():
             retryCount = 0
             done = False
             while not done:  #If the data retrieval is unsuccessful, Try three times before showing that the PLC is offline
-                retSuccess, paused = checkIfPaused(oo.testNum)
-                if retSuccess:  #The data retrieval has been successful.  Exit the loop and populate control with current data
+                rSuccess, isRunning = checkIfRunning(oo.testNum)
+                pSuccess, isPaused = checkIfPaused(oo.testNum)
+                if rSuccess and pSuccess:  #The data retrieval has been successful.  Exit the loop and populate control with current data
                     done = True
-                    if not paused:         
-                        pauseButtons[testIndexDict[oo.testNum]].config(text="In Progress", fg="green", state=NORMAL, command=lambda x=oo: sendPause(x.testNum))
+                    if not isRunning:
+                        tests[currTestPoll].setStopped()
+                    elif isPaused:
+                        tests[currTestPoll].setPaused()
                     else:
-                        pauseButtons[testIndexDict[oo.testNum]].config(text="Paused", fg=T.fg, state=NORMAL, command=lambda x=oo: sendResume(x.testNum))
+                        tests[currTestPoll].setNormal()
+                        
                 else:
                     retryCount += 1 #try again
 
                 if retryCount >= 3:  #The data retrieval has been unsuccessful three times.  Exit the loop and show control offline
                     done = True
-                    pauseButtons[testIndexDict[oo.testNum]].config(text="OFFLINE", fg=T.fg, state=DISABLED, command=None)
+                    oo.setOffline()
+
+            if oo.status == Test.NORMAL:
+                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.NORMAL, fg="green", state=NORMAL, command=lambda x=oo: sendPause(x.testNum))
+            elif oo.status == Test.PAUSED:
+                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.PAUSED, fg=T.fg, state=NORMAL, command=lambda x=oo: sendResume(x.testNum))
+            elif oo.status == Test.STOPPED:
+                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.STOPPED, fg="orange", state=DISABLED, command=None)
+            elif oo.status == Test.OFFLINE:    
+                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.OFFLINE, fg="red", state=DISABLED, command=None)
 
     #populate the screen with current information for the first time
     refresh()
@@ -2003,7 +2045,7 @@ def retrieveControlStatus(slID):
 
     dataVals = []
     for ii in range(numberOfControls):
-        dataVals.append((b[int(ii/8)+3]) & (0x1 << ii%8)) #ammend bit ordering, and convert to a list of booleans
+        dataVals.append(bool((b[ii//8+3]) & (0x1 << ii%8))) #ammend bit ordering, and convert to a list of booleans
         
     return True, dataVals
 
@@ -2131,8 +2173,9 @@ while(running): #root.state() == 'normal'):
                 retSuccess, newData = retrieve(tests[currTestPoll].testNum) #send requests
                 pauseSuccess, isPaused = checkIfPaused(tests[currTestPoll].testNum)
                 runSuccess, isRunning = checkIfRunning(tests[currTestPoll].testNum)
+                contSuccess, contStatus = retrieveControlStatus(tests[currTestPoll].testNum)
 
-                if retSuccess and pauseSuccess and runSuccess: #ensure that all requests were successful
+                if retSuccess and pauseSuccess and runSuccess and contSuccess: #ensure that all requests were successful
                     #update test status based on results
                     if not isRunning:
                         tests[currTestPoll].setStopped()
@@ -2142,11 +2185,12 @@ while(running): #root.state() == 'normal'):
                         tests[currTestPoll].setNormal()
                         
                     tests[currTestPoll].set(newData)
+                    tests[currTestPoll].setControlStatus(contStatus)
                     currTestPoll += 1 #Increment to next test in list
                     retryCount = 0 #Reset retry counter
                 else: 
                     retryCount += 1
-            except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during commuication
+            except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
                 ser.close()
                 ser = None
                 currTestPoll = 0

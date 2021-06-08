@@ -1461,6 +1461,7 @@ def openControls(InitialTestNum=0):
             retryCount = 0
             done = False
             while not done:  #If the data retrieval is unsuccessful, Try three times before showing that the PLC is offline
+                retSuccess, newControlStatus = retrieveControlStatus(tests[currentTestIndex].testNum)
                 if retSuccess:  #The data retrieval has been successful.  Exit the loop and populate controls with current data
                     done = True
                     tests[currentTestIndex].setControlStatus(newControlStatus)

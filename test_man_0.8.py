@@ -1411,7 +1411,7 @@ def openControls(InitialTestNum=0):
         return
     #setup the new menu
     tl = T.apply(Toplevel())
-    tl.title("Label Controls")
+    tl.title("Station Controls")
     tl.grab_set() #make window modal
     tl.focus_set()
 
@@ -1606,9 +1606,9 @@ def pauseTests():
             elif oo.status == Test.PAUSED:
                 pauseButtons[testIndexDict[oo.testNum]].config(text=Test.PAUSED, fg=T.fg, state=NORMAL, command=lambda x=oo: sendResume(x.testNum))
             elif oo.status == Test.STOPPED:
-                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.STOPPED, fg="orange", state=DISABLED, command=None)
+                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.STOPPED.upper(), fg="orange", state=DISABLED, command=None)
             elif oo.status == Test.OFFLINE:    
-                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.OFFLINE, fg="red", state=DISABLED, command=None)
+                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.OFFLINE.upper(), fg="red", state=DISABLED, command=None)
 
     #populate the screen with current information for the first time
     refresh()

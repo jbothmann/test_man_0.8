@@ -890,6 +890,5 @@ while(running): #root.state() == 'normal'):
     root.update() #maintain root window
     
 root.destroy()
-if not ser is None:
-    ser.close()
+
 #root.mainloop()

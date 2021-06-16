@@ -1,0 +1,51 @@
+	{
+		"url": "3333333333333333",
+		"number": 3, 
+		"title": "Demo PLC 3", 
+		"subtitle": "3", 
+		"status": "In Progress",
+		"data": [
+			{
+				"name": "Cycles (3-1)", 
+				"units": "", 
+				"show": true,
+				"float": 300.00
+			}, 
+			{
+				"name": "Cycles (3-2)", 
+				"units": "", 
+				"show": true,
+				"float": 300.00
+			}, 
+			{
+				"name": "Cycles (3-3)", 
+				"units": "", 
+				"show": true,
+				"float": 300.00
+			}, 
+			{
+				"name": "Cycles (3-4)", 
+				"units": "", 
+				"show": true,
+				"float": 300.00
+			} 
+		], 
+		"controls": [
+			{
+				"name": "Enable Fixture 3-1",
+				"bool": true
+			}, 
+			{
+				"name": "Enable Fixture 3-2",
+				"bool": true
+			}, 
+			{
+				"name": "Enable Fixture 3-3",
+				"bool": true
+			}, 
+			{
+				"name": "Enable Fixture 3-4",
+				"bool": true
+			}
+		]
+	}

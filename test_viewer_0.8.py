@@ -5,6 +5,7 @@ from tkSelectLabel import * #Local Import
 from datetime import datetime
 from struct import *
 from time import sleep
+import requests
 
 import serial
 import types
@@ -113,8 +114,9 @@ class Test:
     def __init__(self, url, testNum, title="[title]", subtitle="[subtitle]"):
         global dataFrame
 
-        self.id = url #unique identifying string used as a url 
+        self.url = url #unique identifying string used as a url 
 
+        self.testNum = testNum #slave id of the station
         self.name = title #title of the station, should include name of unit and test type, should be identifiably unique
         self.serial = subtitle #subtitle for the station
         self.status = Test.OFFLINE
@@ -202,41 +204,70 @@ class Test:
         self.data = [] 
         for oo in newData:
             self.data.append(["", "", 0, False])
-            if ii < len(oo):
-                if isinstance(oo, list):
-                    if len(oo) > 0:
-                        if isinstance(oo[0], str):
-                            self.data[-1][0] = oo[0] #set datum name, string
-                            self.data[-1][3] = True #assume the data is used if it has a name
-                            
-                    if len(oo) > 1:
-                        if isinstance(oo[1], str):
-                            self.data[-1][1] = oo[1] #set datum unit, string
-                           
-                    if len(oo) > 2:
-                        self.data[ii][2] = oo[2] #set datum value, currently accepts any value type
-                           
-                    if len(oo) > 3:
-                        if isinstance(oo[3], bool):
-                            self.data[-1][3] = oo[3] #set show datum, boolean
-                           
-                elif isinstance(oo, str):
-                    self.data[ii][0] = oo #set datum name if only a string name is given
-                    self.data[ii][3] = True #assume the data is used if it has a name
+            if isinstance(oo, list):
+                if len(oo) > 0:
+                    if isinstance(oo[0], str):
+                        self.data[-1][0] = oo[0] #set datum name, string
+                        self.data[-1][3] = True #assume the data is used if it has a name
+                        
+                if len(oo) > 1:
+                    if isinstance(oo[1], str):
+                        self.data[-1][1] = oo[1] #set datum unit, string
+                       
+                if len(oo) > 2:
+                    self.data[ii][2] = oo[2] #set datum value, currently accepts any value type
+                       
+                if len(oo) > 3:
+                    if isinstance(oo[3], bool):
+                        self.data[-1][3] = oo[3] #set show datum, boolean
+
+            elif isinstance(oo, dict):
+                if "name" in oo:
+                    if isinstance(oo["name"], str):
+                        self.data[-1][0] = oo["name"] #set datum name, string
+                        self.data[-1][3] = True #assume the data is used if it has a name
+
+                if "units" in oo:
+                    if isinstance(oo["units"], str):
+                        self.data[-1][1] = oo["units"] #set datum unit, string
+
+                if "float" in oo:
+                    if isinstance(oo["float"], float):
+                        self.data[-1][2] = oo["float"] #set value, python float
+
+                if "show" in oo:
+                    if isinstance(oo["show"], bool):
+                        self.data[-1][3] = oo["show"] #set show datum, boolean
+                       
+            elif isinstance(oo, str):
+                self.data[ii][0] = oo #set datum name if only a string name is given
+                self.data[ii][3] = True #assume the data is used if it has a name
+
         self.updateLabel()
 
     def setControls(self, newControls):
         self.controls = []
         for oo in newControls:
             self.controls.append(["", False])
-            if ii < len(oo):
-                if isinstance(oo, list):
-                    if len(oo) > 0:
-                        if isinstance(oo[0], str):
-                            self.controls[-1][0] = oo[0] #set control label, string
-                    if len(oo) > 1:
-                        if isinstance(oo[1], bool):
-                            self.controls[-1][1] = oo[1] #set control status, string
+            if isinstance(oo, list):
+                if len(oo) > 0:
+                    if isinstance(oo[0], str):
+                        self.controls[-1][0] = oo[0] #set control label, string
+
+                if len(oo) > 1:
+                    if isinstance(oo[1], bool):
+                        self.controls[-1][1] = oo[1] #set control status, boolean
+
+            if isinstance(oo, dict):
+                if "name" in oo:
+                    if isinstance(oo["name"], str):
+                        self.controls[-1][0] = oo["name"] #set control label, string
+
+                if "bool" in oo:       
+                    if isinstance(oo["bool"], bool):
+                        self.controls[-1][1] = oo["bool"] #set control status, boolean
+
+
                 elif isinstance(controls[-1], str):
                     self.controls[-1][0] = oo #set control label if only a string name is given
         self.updateLabel()     
@@ -244,7 +275,7 @@ class Test:
     #Test.toString, will return a text representation of the data in the Test object
     def toString(self):
         string = self.name+"\n"+self.serial+"\n"
-        for ii in range(numberOfData):
+        for ii in range(len(self.data)):
             if self.data[ii][3]:
                 string += str(self.data[ii][0])+": "+f'{self.data[ii][2]:.2f}'+" "+str(self.data[ii][1])+"\n"
         return string.rstrip()
@@ -380,13 +411,7 @@ def changeView():
     def refresh():
         nonlocal get
         nonlocal l, r, c
-        #get = requests.get(main_url + 'index')
-        get = [{ #temp data
-            'url':'hjfsdfsad',
-            'number':1,
-            'title':"Demo Test 1",
-            'subtitle':''
-        }]
+        get = requests.get(main_url + 'index')
         #list of all labels
         l = []
         #response list of IntVar()
@@ -394,25 +419,26 @@ def changeView():
         #list of all checkbuttons
         c = []
         #draw the set of checkboxes to the screen
-        for oo in get:
-            l.append(T.apply(SelectLabel(topFrame, text='Station '+oo['number']+'\n'+oo['title']+'\n'+oo['subtitle'])))
+        for oo in get.json():
+            l.append(T.apply(SelectLabel(topFrame, text='Station '+str(oo['number'])+'\n'+str(oo['title'])+'\n'+str(oo['subtitle']))))
             r.append(IntVar())
-            if oo['url'] in [o1.id for o1 in tests]:
+            if oo['url'] in [o1.url for o1 in tests]:
                 r[-1].set(1)
             c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[-1], onvalue=1, offvalue=0, padx=10)))
 
-            l[-1].grid(row=i%10, column=(i//10)*2)
-            c[-1].grid(row=i%10, column=(i//10)*2+1)
+            l[-1].grid(row=len(l)%10, column=(len(l)//10)*2)
+            c[-1].grid(row=len(c)%10, column=(len(c)//10)*2+1)
             
-            if r[i].get() == 1:
-                c[i].select()
+            if r[-1].get() == 1:
+                c[-1].select()
+
+    refresh()
         
     #save changes made during the dialog
     def save():
-        tests = []
-        for ii in range(len(get)):
-            if r[ii]:
-                tests.append(Test(get[ii]['url'], get[ii]['number'], get[ii]['title'], get[ii]['subtitle']))
+        for ii in range(len(get.json())):
+            if r[ii].get():
+                tests.append(Test(get.json()[ii]['url'], get.json()[ii]['number'], get.json()[ii]['title'], get.json()[ii]['subtitle']))
         update()
         view.destroy()
         
@@ -882,11 +908,28 @@ def update():
 #draw screen for the first time
 update()
 
-              
+currTestPoll = 0    
+
 #main loop for recieving checking up and recieving from PLCs and continuing the GUI
 #if the loop encounters an error while parsing three times in a row, it will mark the test as offline and proceed to poll the next test
 while(running): #root.state() == 'normal'):
-    
+    if currTestPoll < len(tests):
+        try:
+            get = requests.get(main_url+"station/"+tests[currTestPoll].url)
+            tests[currTestPoll].testNum = get.json()['number']
+            tests[currTestPoll].name = get.json()['title']
+            tests[currTestPoll].serial = get.json()['subtitle']
+            tests[currTestPoll].status = get.json()['status']
+            tests[currTestPoll].setData(get.json()['data'])
+            tests[currTestPoll].setControls(get.json()['controls'])
+
+
+        except exception as e:
+            pass
+        currTestPoll += 1
+    if currTestPoll >= len(tests): #reset poll index to zero
+        currTestPoll = 0
+
     root.update() #maintain root window
     
 root.destroy()

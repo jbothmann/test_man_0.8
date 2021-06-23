@@ -3,12 +3,9 @@ from tkinter import messagebox
 from tkinter import filedialog
 from tkSelectLabel import * #Local Import
 from datetime import datetime
-from struct import *
 from time import sleep
 import requests
 
-import serial
-import types
 import json
 import copy
 import os
@@ -17,7 +14,9 @@ import random
 
 version = "0.8"
 
-main_url = "http://127.0.0.1:5000/"
+pollPeriod = 0.01 #in seconds
+
+main_url = "http://test_man:5000/"
 
 numberOfData = 32
 numberOfControls = 32
@@ -29,16 +28,14 @@ encoded_string = b'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6
 root = Tk()
 favicon = PhotoImage(data=encoded_string)
 root.iconphoto(True, favicon) #sets the favicon for root and all toplevel()
-root.title('Power Tools Test Manager')
+root.title('Power Tools Test Viewer')
 running = True
 
 #procedure to be taken when attempting to exit the program, which will prompt a save
 def exitProgram():
     global running
-    response = messagebox.askyesnocancel("Power Tools Test Manager", "Save before closing Test Manager?", parent=root.focus_get())
-    if not response is None:
-        if response:
-            saveSession()
+    response = messagebox.askyesno("Power Tools Test Viewer", "Exit Test Viewer?", parent=root.focus_get())
+    if response:
         running = False
 
 root.protocol('WM_DELETE_WINDOW', exitProgram) #Override close button with exitProgram
@@ -285,70 +282,7 @@ tests = []
 #Dictionary which will be used to link address to index in tests[]
 testIndexDict = {}
 
-                                  
-def saveSession():
-    try:
-        #open *.JSON file using system dialog
-        file = filedialog.asksaveasfile(parent=root, initialdir = "/", title = "Save As", filetypes = (("JSON Files","*.json"),), defaultextension="*.*")
-    except OSError as e: #catch errors relating to opening the file
-        messagebox.showerror("Power Tools Test Manager", "Could not save file", parent=root.focus_get())
-    else:
-        if not file is None:
-            testList = []
-            for oo in tests:
-                testList.append({
-                    "number":oo.testNum, 
-                    "title":oo.name, 
-                    "subtitle":oo.serial, 
-                    "data":[{
-                        "name":oo.data[ii][0],
-                        "units":oo.data[ii][1],
-                        "show":oo.data[ii][3]
-                        } for ii in range(numberOfData)],
-
-                    "controls":[{"name":oo.controls[ii][0]} for ii in range(numberOfControls)]
-                    })
-            json.dump(testList, file)
-    finally:
-        if not file is None:
-            file.close()
-        
-def openSession():
-    try:
-        #open *.JSON file using system dialog
-        file = filedialog.askopenfile(parent=root, initialdir = "/", title = "Open", filetypes = (("JSON Files","*.json"),))
-    except OSError as e: #catch errors relating to opening the file
-        messagebox.showerror("Power Tools Test Manager", "Could not open file", parent=root.focus_get())
-    else:
-        if not file is None:
-            testList = json.load(file)
-            try:
-                for oo in testList:
-                    tests.append(Test(
-                        oo["number"], 
-                        oo["title"], 
-                        oo["subtitle"], 
-                        [[
-                            oo["data"][ii]["name"], 
-                            oo["data"][ii]["units"], 
-                            0, 
-                            oo["data"][ii]["show"] 
-                            ]for ii in range(numberOfData)], 
-                        [oo["controls"][ii]["name"] for ii in range(numberOfControls)]
-                        ))
-            except TypeError as e: #old version file support
-                for oo in testList:
-                    if len(oo) >= 5: #prevent oob errors
-                        tests.append(Test(oo[0], oo[1], oo[2], oo[3], oo[4]))
-                    elif len(oo) >= 4: #0.5 version file support
-                        tests.append(Test(oo[0], oo[1], oo[2], oo[3]))
-                    else:
-                        messagebox.showerror("Power Tools Test Manager", "Incompatible File", parent=root.focus_get())
-    finally:
-        if not file is None:
-            file.close()
-        update()
-        
+#connect(), opens a dialog which allows the user to enter the url that they want to connect to 
 def connect():
     global main_url
     #setup the new menu
@@ -356,8 +290,6 @@ def connect():
     connector.title('Enter URL')
     connector.grab_set() #make window modal
     connector.focus_set()
-
-    
 
     #connects the program to the chosen COM port
     def connect():
@@ -381,7 +313,7 @@ def connect():
     connector.update_idletasks()
     connector.minsize(width=max(connector.winfo_reqwidth(),0), height=max(connector.winfo_reqheight(),0))
 
-#changeView, opens a dialog which allows the user to choose which tests are drawn on the screen    
+#changeView, opens a dialog which allows the user to choose which tests are drawn on the screen #TODO: make this look good 
 def changeView():
     global tests
     
@@ -411,6 +343,12 @@ def changeView():
     def refresh():
         nonlocal get
         nonlocal l, r, c
+
+        #forget all children in anticipation of reordering and redrawing them
+        for child in topFrame.winfo_children():
+            child.grid_forget()
+
+        #make GET request to API server
         get = requests.get(main_url + 'index')
         #list of all labels
         l = []
@@ -491,23 +429,20 @@ def writeToFile():
     #list of all checkbuttons
     c = []
     #draw the set of checkboxes to the screen
-    for i in range(len(tests)):
-        option = "Station "+str(tests[i].testNum)+": "+tests[i].name
+    for ii in range(len(tests)):
+        option = "Station "+str(tests[ii].testNum)+": "+tests[ii].name
         l.append(T.apply(SelectLabel(topFrame, text=option)))
         r.append(IntVar())
-        r[i].set(tests[i].showTest)
-        c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[i], onvalue=1, offvalue=0, padx=10)))
+        r[ii].set(tests[ii].showTest)
+        c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[ii], onvalue=1, offvalue=0, padx=10)))
 
-        l[-1].grid(row=i%10, column=(i//10)*2)
-        c[-1].grid(row=i%10, column=(i//10)*2+1)
+        l[-1].grid(row=ii%10, column=(ii//10)*2)
+        c[-1].grid(row=ii%10, column=(ii//10)*2+1)
         
-        if r[i].get() == 1:
-            c[i].select()
+        if r[ii].get() == 1:
+            c[ii].select()
 
-    ctVar = BooleanVar()
-    commentToggle = T.apply(Checkbutton(writer, text = "Include Comments?", variable = ctVar, onvalue=1, offvalue=0, padx=0))
-    commentToggle.pack(side=BOTTOM)
-    commentToggle.select()
+    
         
     #writes specified info to file
     def save():
@@ -515,17 +450,14 @@ def writeToFile():
             #open *.txt file using system dialog
             file = filedialog.asksaveasfile(parent=writer, initialdir = "/", title = "Save As", filetypes = (("Text Files","*.txt"),), defaultextension="*.*")
         except OSError as e: #catch errors relating to opening the file
-            messagebox.showerror("Power Tools Test Manager", "Could not open file", parent=root.focus_get())
+            messagebox.showerror("Power Tools Test Viewer", "Could not open file", parent=root.focus_get())
         else:
             if not file is None:
-                file.write("Snap-On Test Manager, Version "+version+"\n")
+                file.write("Snap-On Test Viewer, Version "+version+"\n")
                 file.write(datetime.now().strftime("Data Captured on %m/%d/%Y at %H:%M:%S"))
-                for i in range(len(r)):
-                    if r[i].get() == 1:
-                        if ctVar.get():
-                            file.write("\n\nStation "+str(tests[i].testNum)+": "+str(tests[i].toStringPlusComments()))
-                        else:
-                            file.write("\n\nStation "+str(tests[i].testNum)+": "+str(tests[i].toString()))
+                for ii in range(len(r)):
+                    if r[ii].get() == 1:
+                        file.write("\n\nStation "+str(tests[ii].testNum)+": "+str(tests[ii].toString())) #TODO: add status?
                 writer.destroy()
         finally:
             if not file is None:
@@ -569,7 +501,7 @@ def openControls(InitialTestNum=0):
         return
     #setup the new menu
     tl = T.apply(Toplevel())
-    tl.title("Label Controls")
+    tl.title("Station Controls")
     tl.grab_set() #make window modal
     tl.focus_set()
 
@@ -582,98 +514,68 @@ def openControls(InitialTestNum=0):
     botFrame = T.apply(Frame(tl, bd=0))
     botFrame.pack(side=BOTTOM)
 
+    #Set the test index from the dictionary using the InitialTestNum specified
     if InitialTestNum in testIndexDict:
         currentTestIndex=testIndexDict[InitialTestNum]
     else:
         currentTestIndex=-1
 
-    #Building an array of the interactable objects
+    #Building an array of display objects
     numLabel = []
-    controlButtons = []
+    controlStatusLabels = []
     controlNameLabels = []
     for ii in range(numberOfControls):
         numLabel.append(T.apply(Label(midFrame, text=str(ii+1))))
-        controlButtons.append(T.apply(Button(midFrame, width=8)))
-        controlNameLabels.append(Label(midFrame, width=10, bg=T.contrastbg, fg=T.contrastfg, font=(T.font, T.fontSize), justify=LEFT))
+        controlStatusLabels.append(T.apply(Label(midFrame, width=8)))
+        controlNameLabels.append(SelectLabel(midFrame, width=14, height=1, bg=T.contrastbg, fg=T.contrastfg, font=(T.font, T.fontSize), justify=LEFT, shrink=False))
 
         numLabel[ii].grid(row=(ii%16+3), column=(int(ii/16)*4))
-        controlButtons[ii].grid(row=(ii%16+3), column=(int(ii/16)*4+1))
-        controlNameLabels[ii].grid(row=(ii%16+3), column=(int(ii/16)*4+2), padx=5)
-
-    
-    def sendCommand(controlIndex, value):
-        control(tests[currentTestIndex].testNum, controlIndex, value)
-        update(currentTestIndex)
+        controlStatusLabels[ii].grid(row=(ii%16+3), column=(int(ii/16)*4+2))
+        controlNameLabels[ii].grid(row=(ii%16+3), column=(int(ii/16)*4+1), padx=5)
 
 
-    dropdown = T.apply(Menubutton(topFrame, text="[default]", relief=RAISED))
-
-    #update() is called whenever a new selection is made on the dropdown menu.  It reconfigures the window to reflect what was chosen.
-    #if update() is passed an invalid index, then it will show a default selection
-    def update(testIndex):
+    #refresh() is called whenever a new selection is made on the dropdown menu.  It reconfigures the window to reflect what was chosen.
+    #if refresh() is passed an invalid index, then it will show a default selection
+    def refresh(testIndex):
         nonlocal currentTestIndex
+        
         currentTestIndex=testIndex
         if (currentTestIndex>=0): 
             dropdown.config(text=("Station "+str(tests[testIndex].testNum)+": "+tests[testIndex].name+" \U000025BC"))
 
-            retryCount = 0
-            done = False
-            while not done:  #If the data retrieval is unsuccessful, Try three times before showing that the PLC is offline
-                retSuccess, newControlStatus = retrieveControlStatus(tests[currentTestIndex].testNum)
-                if retSuccess:  #The data retrieval has been successful.  Exit the loop and populate controls with current data
-                    done = True
-                    tests[currentTestIndex].setControlStatus(newControlStatus)
-                    for ii in range(numberOfControls):
-                        if newControlStatus[ii]:         
-                            controlButtons[ii].config(text="ON", fg="green", state=NORMAL, command=lambda x=ii: sendCommand(x+1, 0))
-                        else:
-                            controlButtons[ii].config(text="OFF", fg=T.fg, state=NORMAL, command=lambda x=ii: sendCommand(x+1, 1))
-                else:
-                    retryCount += 1 #try again
-
-                if retryCount >= 3:  #The data retrieval has been unsuccessful three times.  Exit the loop and show controls offline
-                    done = True
-                    tests[currentTestIndex].setOffline()
-                    for ii in range(numberOfControls):
-                        controlButtons[ii].config(text="OFFLINE", fg=T.fg, state=DISABLED, command=None)
-
             for ii in range(numberOfControls):
-                controlNameLabels[ii].config(text=tests[currentTestIndex].controls[ii][0])
-                if tests[currentTestIndex].status == Test.OFFLINE:
-                    controlButtons[ii].config(text="OFFLINE", fg=T.fg, state=DISABLED, command=None)
-                else:
-                    if tests[currentTestIndex].controls[ii][1]:
-                        controlButtons[ii].config(text="ON", fg="green", state=NORMAL, command=lambda x=ii: sendCommand(x+1, 0))
+                if ii < len(tests[currentTestIndex].controls):
+                    controlNameLabels[ii].config(text=tests[currentTestIndex].controls[ii][0])
+                    if tests[currentTestIndex].status == Test.OFFLINE:
+                        controlStatusLabels[ii].config(text="OFFLINE", fg="red")
                     else:
-                        controlButtons[ii].config(text="OFF", fg=T.fg, state=NORMAL, command=lambda x=ii: sendCommand(x+1, 1))                
+                        if tests[currentTestIndex].controls[ii][1]:
+                            controlStatusLabels[ii].config(text="ON", fg="green")
+                        else:
+                            controlStatusLabels[ii].config(text="OFF", fg=T.fg)
+                else:
+                    controlNameLabels[ii].config(text=" ")
+                    controlStatusLabels[ii].config(text=" ")        
                         
         else:
             dropdown.config(text=("Choose a station to control \U000025BC"))
             for ii in range(numberOfControls):
-                controlNameLabels[ii].config(text="")
-                controlButtons[ii].config(text="", state=DISABLED)
+                controlNameLabels[ii].config(text=" ")
+                controlStatusLabels[ii].config(text=" ")
 
-    #close the current window and open the control label editor for the selected test
-    def openControlEditor():
-        tl.destroy()
-        if currentTestIndex>=0:
-            editControls(tests[currentTestIndex].testNum)
-        else:
-            editControls()
         
     #create and assign a menu to the dropdown menubutton.  This menu will allow the user to select which station they want to control.
+    dropdown = T.apply(Menubutton(topFrame, text="[default]", relief=RAISED))
     dropdown.menu = T.apply(Menu(dropdown, tearoff=0))
     dropdown["menu"] = dropdown.menu
     for ii in range(len(tests)):
-        dropdown.menu.add_command(label=("Station "+str(tests[ii].testNum)+": "+tests[ii].name), command=lambda x=ii: update(x))
+        dropdown.menu.add_command(label=("Station "+str(tests[ii].testNum)+": "+tests[ii].name), command=lambda x=ii: refresh(x))
     dropdown.grid()
 
-    update(currentTestIndex) #populate the screen for the first time
-
-    T.apply(Button(botFrame, text="Edit Labels", command=openControlEditor)).grid(row=0, column=0, padx=5, pady=5)
+    refresh(currentTestIndex) #populate the screen for the first time
 
     #refresh button
-    T.apply(Button(botFrame, text="Refresh", command=lambda: update(currentTestIndex))).grid(row=0, column=1, padx=5, pady=5)
+    T.apply(Button(botFrame, text="Refresh", command=lambda: refresh(currentTestIndex))).grid(row=0, column=1, padx=5, pady=5)
 
     #cancel button
     T.apply(Button(botFrame, text="Close", command=tl.destroy)).grid(row=0, column=3, padx=5, pady=5)
@@ -860,9 +762,7 @@ ver.pack(side=BOTTOM, fill='x')
 menubar = Menu(root)
 
 fileMenu = Menu(menubar, tearoff=0)
-fileMenu.add_command(label="Save Session", command=saveSession)
-fileMenu.add_command(label="Open Session", command=openSession)
-fileMenu.add_command(label="Connect to Port", command=connect)
+fileMenu.add_command(label="Change Server Address", command=connect)
 fileMenu.add_command(label="Write to File", command=writeToFile)
 fileMenu.add_command(label="Exit", command=exitProgram)
 menubar.add_cascade(label="File", menu=fileMenu)
@@ -881,7 +781,7 @@ def update():
     global dataFrame
     global testIndexDict
     #apply appearance theme to main window
-    T.apply([root, dataFrame, ver])
+    T.apply([root, dataFrame, ver, fileMenu, viewMenu])
     verText.config(bg=T.bg, fg=T.fg, font=(T.font, T.fontSize-2, "italic"))
 
     #forget all children in anticipation of reordering and redrawing them
@@ -895,10 +795,8 @@ def update():
         
         if tests[i].showTest:
             tests[i].draw(int(placer/10)+1, placer%10)
-            placer += 1
-        
 
-    T.apply([fileMenu, viewMenu])
+            placer += 1
 
     root.update_idletasks()
     root.geometry(str(max(root.winfo_reqwidth(),400))+'x'+str(max(root.winfo_reqheight(),300)))
@@ -923,12 +821,13 @@ while(running): #root.state() == 'normal'):
             tests[currTestPoll].setData(get.json()['data'])
             tests[currTestPoll].setControls(get.json()['controls'])
 
-
-        except exception as e:
+        except exception as e:  #TODO: Handle disconnects from the server
             pass
         currTestPoll += 1
     if currTestPoll >= len(tests): #reset poll index to zero
         currTestPoll = 0
+
+    sleep(pollPeriod)
 
     root.update() #maintain root window
     

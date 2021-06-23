@@ -120,8 +120,8 @@ class Test:
     #all urls should be appended to a main address
     def generateUrl():
         url = ''.join(random.choice(string.ascii_letters+string.digits) for ii in range(16))
-        if url not in urlsInUse:
-            urlsInUse.append(url)
+        if url not in Test.urlsInUse:
+            Test.urlsInUse.append(url)
         else:
             url = generateUrl()
         return url
@@ -135,7 +135,7 @@ class Test:
         except ValueError as e:
             self.testNum = -1
 
-        self.url = generateUrl() #unique identifying string used by the API #TODO: does this need to be unique garunteed?
+        self.url = Test.generateUrl() #unique identifying string used by the API
 
         self.name = name #title of the station, should include name of unit and test type, should be identifiably unique
         self.serial = serial #subtitle for the station
@@ -554,7 +554,9 @@ def connect():  #TODO: Indicate when the program is connected, and add the abili
         except serial.serialutil.SerialException:
             messagebox.showerror("Power Tools Test Manager", "Could not connect to COM port", parent=root.focus_get())
         else:
+            update()
             connector.destroy()
+
 
     #draw port chooser dropdown
     dropdown = T.apply(Menubutton(connector, width=17, relief=RAISED))
@@ -1377,7 +1379,7 @@ def editControls(initialTestNum=0):
             for ii in range(numberOfControls):
                 controlNameEntries[ii].config(state=NORMAL)
                 controlNameEntries[ii].delete(0, END)
-                controlNameEntries[ii].insert(0, tests[currentTestIndex].controls[ii])
+                controlNameEntries[ii].insert(0, tests[currentTestIndex].controls[ii][0])
         else:
             dropdown.config(text=("Choose a station to edit \U000025BC"))
             for ii in range(numberOfControls):
@@ -1481,19 +1483,12 @@ def openControls(InitialTestNum=0):
                 if retSuccess:  #The data retrieval has been successful.  Exit the loop and populate controls with current data
                     done = True
                     tests[currentTestIndex].setControlStatus(newControlStatus)
-                    for ii in range(numberOfControls):
-                        if newControlStatus[ii]:         
-                            controlButtons[ii].config(text="ON", fg="green", state=NORMAL, command=lambda x=ii: sendCommand(x+1, 0))
-                        else:
-                            controlButtons[ii].config(text="OFF", fg=T.fg, state=NORMAL, command=lambda x=ii: sendCommand(x+1, 1))
                 else:
                     retryCount += 1 #try again
 
                 if retryCount >= 3:  #The data retrieval has been unsuccessful three times.  Exit the loop and show controls offline
                     done = True
                     tests[currentTestIndex].setOffline()
-                    for ii in range(numberOfControls):
-                        controlButtons[ii].config(text="OFFLINE", fg=T.fg, state=DISABLED, command=None)
 
             for ii in range(numberOfControls):
                 controlNameLabels[ii].config(text=tests[currentTestIndex].controls[ii][0])

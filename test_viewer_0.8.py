@@ -16,6 +16,8 @@ version = "0.8"
 
 pollPeriod = 0.01 #in seconds
 
+pollTimeout = 0.01
+
 main_url = "http://test_man:5000/"
 
 numberOfData = 32
@@ -293,9 +295,37 @@ def connect():
 
     #connects the program to the chosen COM port
     def connect():
-        main_url = urlEntry.get()
-        #TODO: test communication before letting the program connect
-        connector.destroy()
+        global main_url
+        global pollTimeout
+        try:
+            get = requests.get(main_url, timeout = pollTimeout)
+            get.raise_for_status()
+            if not get.json()['app'] == "Power Tools Test Manager":
+                raise Exception('wrong app')
+            if not get.json()['version'] == version:
+                raise Exception('wrong version')
+
+        except requests.exceptions.ConnectionError as e:
+            messagebox.showerror("Power Tools Test Viewer", "That address could not be reached", parent=root.focus_get())
+        except requests.exceptions.HTTPError as e:
+            messagebox.showerror("Power Tools Test Viewer", "That address provided a bad response (Type H)", parent=root.focus_get())
+        except requests.exceptions.Timeout as e:
+            messagebox.showerror("Power Tools Test Viewer", "That address took too long to respond", parent=root.focus_get())
+        except json.JSONDecodeError as e:
+            messagebox.showerror("Power Tools Test Viewer", "That address provided a bad response (Type J)", parent=root.focus_get())
+        except KeyError as e:
+            messagebox.showerror("Power Tools Test Viewer", "That address provided a bad response (Type K)", parent=root.focus_get())
+        except Exception as e:
+            if 'wrong app' in e.args:
+                messagebox.showerror("Power Tools Test Viewer", "That address is not serving a compatible application", parent=root.focus_get())
+            elif 'wrong version' in e.args:
+                messagebox.showerror("Power Tools Test Viewer", "That address is not serving a compatible version of Power Tools Test Manager", parent=root.focus_get())
+            else:
+                raise
+
+        else:
+            main_url = urlEntry.get()
+            connector.destroy()
 
     #draw url entry
     urlEntry = T.apply(Entry(connector, width=17))
@@ -821,8 +851,10 @@ while(running): #root.state() == 'normal'):
             tests[currTestPoll].setData(get.json()['data'])
             tests[currTestPoll].setControls(get.json()['controls'])
 
-        except exception as e:  #TODO: Handle disconnects from the server
-            pass
+        except requests.exceptions.ConnectionError as e:
+            raise
+        except Exception as e:  #TODO: Handle disconnects from the server
+            raise
         currTestPoll += 1
     if currTestPoll >= len(tests): #reset poll index to zero
         currTestPoll = 0

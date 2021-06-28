@@ -2,7 +2,7 @@ import os
 
 from flask import Flask, json
 
-DIR =  "C:/Users/np0083/Documents/GitHub/test_man_0.8/Test Server/dummy JSON/"
+DIR =  "D:/Documents/GitHub/test_man_0.8/Test Server/dummy JSON/"
 
 def create_app():
     app = Flask(__name__, instance_relative_config=True)

@@ -18,7 +18,9 @@ pollPeriod = 0.01 #in seconds
 
 pollTimeout = 0.01
 
-main_url = "http://test_man:5000/"
+main_url = "http://localhost:5000/"
+
+online = True #TODO: implement offline mode
 
 numberOfData = 32
 numberOfControls = 32
@@ -31,6 +33,7 @@ root = Tk()
 favicon = PhotoImage(data=encoded_string)
 root.iconphoto(True, favicon) #sets the favicon for root and all toplevel()
 root.title('Power Tools Test Viewer')
+
 running = True
 
 #procedure to be taken when attempting to exit the program, which will prompt a save
@@ -307,6 +310,8 @@ def connect():
 
         except requests.exceptions.ConnectionError as e:
             messagebox.showerror("Power Tools Test Viewer", "That address could not be reached", parent=root.focus_get())
+        except socket.gaierror as e:
+            messagebox.showerror("Power Tools Test Viewer", "That address could not be resolved to a valid address", parent=root.focus_get())
         except requests.exceptions.HTTPError as e:
             messagebox.showerror("Power Tools Test Viewer", "That address provided a bad response (Type H)", parent=root.focus_get())
         except requests.exceptions.Timeout as e:
@@ -388,11 +393,11 @@ def changeView():
         c = []
         #draw the set of checkboxes to the screen
         for oo in get.json():
-            l.append(T.apply(SelectLabel(topFrame, text='Station '+str(oo['number'])+'\n'+str(oo['title'])+'\n'+str(oo['subtitle']))))
+            l.append(T.apply(SelectLabel(topFrame, text='Station '+str(oo['number'])+'\n'+str(oo['title'])+'\n'+str(oo['subtitle']), pady=5)))
             r.append(IntVar())
             if oo['url'] in [o1.url for o1 in tests]:
                 r[-1].set(1)
-            c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[-1], onvalue=1, offvalue=0, padx=10)))
+            c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[-1], onvalue=1, offvalue=0, padx=5)))
 
             l[-1].grid(row=len(l)%10, column=(len(l)//10)*2)
             c[-1].grid(row=len(c)%10, column=(len(c)//10)*2+1)
@@ -422,15 +427,15 @@ def changeView():
             oo.deselect()
             
     #cancel button
-    T.apply(Button(botFrame, text="Cancel", command=view.destroy).grid(row=0, column=3, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Cancel", command=view.destroy).grid(row=0, column=4, padx=5, pady=5))
     #save button
-    T.apply(Button(botFrame, text="Save", command=save).grid(row=0, column=2, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Save", command=save).grid(row=0, column=3, padx=5, pady=5))
     #Select All button
     T.apply(Button(botFrame, text="Select All", command=selectAll).grid(row=0, column=0, padx=5, pady=5))
     #Deselect All button
     T.apply(Button(botFrame, text="Deselect All", command=deselectAll).grid(row=0, column=1, padx=5, pady=5))
     #Refresh Button
-    T.apply(Button(botFrame, text="Refresh", command=refresh).grid(row=1, column=1, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Refresh", command=refresh).grid(row=0, column=2, padx=5, pady=5))
 
     view.update_idletasks()
     view.minsize(width=max(view.winfo_reqwidth(),300), height=max(view.winfo_reqheight(),200))
@@ -782,7 +787,10 @@ dataFrame = LabelFrame(root, bd=0)
 dataFrame.pack(side=TOP)
 
 #Version label in the far right, on a window-spanning relief bar
+#the relief also contains a hint message on the left side of the window
 ver = Frame(root, bd=1, relief=SUNKEN)
+hint = Label(ver, text = '')
+hint.pack(side=LEFT)
 verText = Label(ver, text="version " + version)
 verText.pack(side=RIGHT)
 ver.pack(side=BOTTOM, fill='x')
@@ -813,6 +821,7 @@ def update():
     #apply appearance theme to main window
     T.apply([root, dataFrame, ver, fileMenu, viewMenu])
     verText.config(bg=T.bg, fg=T.fg, font=(T.font, T.fontSize-2, "italic"))
+    hint.config(bg=T.bg, fg=T.fg, font=(T.font, T.fontSize-2))
 
     #forget all children in anticipation of reordering and redrawing them
     for child in dataFrame.winfo_children():
@@ -852,6 +861,7 @@ while(running): #root.state() == 'normal'):
             tests[currTestPoll].setControls(get.json()['controls'])
 
         except requests.exceptions.ConnectionError as e:
+            print('0')
             raise
         except Exception as e:  #TODO: Handle disconnects from the server
             raise

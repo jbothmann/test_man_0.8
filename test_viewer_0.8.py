@@ -20,8 +20,6 @@ pollTimeout = 0.01
 
 main_url = "http://localhost:5000/"
 
-online = True #TODO: implement offline mode
-
 numberOfData = 32
 numberOfControls = 32
 
@@ -132,11 +130,16 @@ class Test:
         self.c = None #column that the test is drawn to in the main viewer
         #boolean which allows the test to be hidden
         self.showTest = True
+
+        self.online = True #boolean value that represents if the application has encountered any problems connecting to that url or not
         
-        #initialize labelWidgetFrame and its children.  This widget will show the title of the station and a small edit button
+        #initialize labelWidgetFrame and its children.  This widget will show the title of the station
+        #connectionHint is a label that is normally empty, but will warn the user if the station becomes disconnected
         self.labelWidgetFrame = Frame()
         self.stationNumLabel = Label(self.labelWidgetFrame)
         self.stationNumLabel.grid(row=0, column=0)
+        self.connectionHint = Label(self.labelWidgetFrame)
+        self.connectionHint.grid(row=0, column=1)
 
         #initialize frame, which will be used to store the widgets
         self.frame = LabelFrame(dataFrame, labelwidget=self.labelWidgetFrame, padx=5, pady=5, relief=RIDGE)
@@ -165,9 +168,10 @@ class Test:
         self.c = c
 
         #apply theme to all widgets
-        T.apply([self.labelWidgetFrame, self.stationNumLabel, self.frame, self.dataLabel, self.statusIndicator, self.button2])
+        T.apply([self.labelWidgetFrame, self.stationNumLabel, self.connectionHint, self.frame, self.dataLabel, self.statusIndicator, self.button2])
 
         self.stationNumLabel.config(text="Station " + str(self.testNum), font=(T.font, T.fontSize+2))
+        self.connectionHint.config(fg = 'red')
         self.frame.grid(row=r, column=c, pady=3, padx=3) #regrid the frame
 
         #add correct information to widgets
@@ -271,8 +275,18 @@ class Test:
 
 
                 elif isinstance(controls[-1], str):
-                    self.controls[-1][0] = oo #set control label if only a string name is given
-        self.updateLabel()     
+                    self.controls[-1][0] = oo #set control label if only a string name is given 
+
+    def setOnline(self):
+        if not self.online:
+            self.online = True
+            self.connectionHint.config(text="")
+
+    def setOffline(self):
+        if self.online:
+            self.online = False
+            self.connectionHint.config(text="No Connection")
+
 
     #Test.toString, will return a text representation of the data in the Test object
     def toString(self):
@@ -308,10 +322,11 @@ def connect():
             if not get.json()['version'] == version:
                 raise Exception('wrong version')
 
+        #TODO: allow url mutation after displaying error?
         except requests.exceptions.ConnectionError as e:
             messagebox.showerror("Power Tools Test Viewer", "That address could not be reached", parent=root.focus_get())
         except socket.gaierror as e:
-            messagebox.showerror("Power Tools Test Viewer", "That address could not be resolved to a valid address", parent=root.focus_get())
+            messagebox.showerror("Power Tools Test Viewer", "That address could not be resolved as valid", parent=root.focus_get())
         except requests.exceptions.HTTPError as e:
             messagebox.showerror("Power Tools Test Viewer", "That address provided a bad response (Type H)", parent=root.focus_get())
         except requests.exceptions.Timeout as e:
@@ -348,7 +363,7 @@ def connect():
     connector.update_idletasks()
     connector.minsize(width=max(connector.winfo_reqwidth(),0), height=max(connector.winfo_reqheight(),0))
 
-#changeView, opens a dialog which allows the user to choose which tests are drawn on the screen #TODO: make this look good 
+#changeView, opens a dialog which allows the user to choose which tests are drawn on the screen 
 def changeView():
     global tests
     
@@ -383,27 +398,30 @@ def changeView():
         for child in topFrame.winfo_children():
             child.grid_forget()
 
-        #make GET request to API server
-        get = requests.get(main_url + 'index')
-        #list of all labels
-        l = []
-        #response list of IntVar()
-        r = []
-        #list of all checkbuttons
-        c = []
-        #draw the set of checkboxes to the screen
-        for oo in get.json():
-            l.append(T.apply(SelectLabel(topFrame, text='Station '+str(oo['number'])+'\n'+str(oo['title'])+'\n'+str(oo['subtitle']), pady=5)))
-            r.append(IntVar())
-            if oo['url'] in [o1.url for o1 in tests]:
-                r[-1].set(1)
-            c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[-1], onvalue=1, offvalue=0, padx=5)))
+        try:
+            #make GET request to API server
+            get = requests.get(main_url + 'index')
+            #list of all labels
+            l = []
+            #response list of IntVar()
+            r = []
+            #list of all checkbuttons
+            c = []
+            #draw the set of checkboxes to the screen
+            for oo in get.json():
+                l.append(T.apply(SelectLabel(topFrame, text='Station '+str(oo['number'])+'\n'+str(oo['title'])+'\n'+str(oo['subtitle']), pady=5)))
+                r.append(IntVar())
+                if oo['url'] in [o1.url for o1 in tests]:
+                    r[-1].set(1)
+                c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[-1], onvalue=1, offvalue=0, padx=5)))
 
-            l[-1].grid(row=len(l)%10, column=(len(l)//10)*2)
-            c[-1].grid(row=len(c)%10, column=(len(c)//10)*2+1)
-            
-            if r[-1].get() == 1:
-                c[-1].select()
+                l[-1].grid(row=len(l)%5, column=(len(l)//5)*2)
+                c[-1].grid(row=len(c)%5, column=(len(c)//5)*2+1)
+                
+                if r[-1].get() == 1:
+                    c[-1].select()
+        except Exception as e:
+            messagebox.showerror("Power Tools Test Viewer", "An error occured while connecting to the index", parent=root.focus_get())
 
     refresh()
         
@@ -439,6 +457,12 @@ def changeView():
 
     view.update_idletasks()
     view.minsize(width=max(view.winfo_reqwidth(),300), height=max(view.winfo_reqheight(),200))
+
+#removeAllStations, gives the user simple way to remove all stations from the screen, and also from polling
+#calling this function will cease network activity until a new station is added
+def removeAllStations():
+    del tests[:]
+    update()
 
 #writeToFile, allows the user to store current test information in a .txt file of their choice
 def writeToFile():
@@ -492,7 +516,7 @@ def writeToFile():
                 file.write(datetime.now().strftime("Data Captured on %m/%d/%Y at %H:%M:%S"))
                 for ii in range(len(r)):
                     if r[ii].get() == 1:
-                        file.write("\n\nStation "+str(tests[ii].testNum)+": "+str(tests[ii].toString())) #TODO: add status?
+                        file.write("\n\nStation "+str(tests[ii].testNum)+": "+str(tests[ii].toString()))
                 writer.destroy()
         finally:
             if not file is None:
@@ -593,7 +617,7 @@ def openControls(InitialTestNum=0):
                     controlStatusLabels[ii].config(text=" ")        
                         
         else:
-            dropdown.config(text=("Choose a station to control \U000025BC"))
+            dropdown.config(text=("Select a Station \U000025BC"))
             for ii in range(numberOfControls):
                 controlNameLabels[ii].config(text=" ")
                 controlStatusLabels[ii].config(text=" ")
@@ -796,7 +820,7 @@ verText.pack(side=RIGHT)
 ver.pack(side=BOTTOM, fill='x')
 
 
-#build the windows-style menubar with multiple cascades #TODO: weird line?? Fonts not working???
+#build the windows-style menubar with multiple cascades
 menubar = Menu(root)
 
 fileMenu = Menu(menubar, tearoff=0)
@@ -807,6 +831,7 @@ menubar.add_cascade(label="File", menu=fileMenu)
 
 viewMenu = Menu(menubar, tearoff=0)
 viewMenu.add_command(label="Select Stations", command=changeView)
+viewMenu.add_command(label="Clear all Stations", command=removeAllStations)
 viewMenu.add_command(label="Theme", command=theme)
 viewMenu.add_command(label="Show Controls", command=openControls)
 menubar.add_cascade(label="View", menu=viewMenu)
@@ -859,17 +884,15 @@ while(running): #root.state() == 'normal'):
             tests[currTestPoll].status = get.json()['status']
             tests[currTestPoll].setData(get.json()['data'])
             tests[currTestPoll].setControls(get.json()['controls'])
+            tests[currTestPoll].setOnline()
 
-        except requests.exceptions.ConnectionError as e:
-            print('0')
-            raise
-        except Exception as e:  #TODO: Handle disconnects from the server
-            raise
+        except Exception as e:
+            tests[currTestPoll].setOffline()
         currTestPoll += 1
     if currTestPoll >= len(tests): #reset poll index to zero
         currTestPoll = 0
 
-    sleep(pollPeriod)
+    #sleep(pollPeriod)
 
     root.update() #maintain root window
     

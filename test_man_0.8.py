@@ -21,7 +21,8 @@ serTimeout = 0.1
 numberOfData = 32
 numberOfControls = 32
 
-ser = None #initialize serial connection to none
+ser = serial.Serial(port = None, baudrate=38400, parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=serTimeout) 
+#initialize serial connection configuration, without selecting a port.  ser will not open until ser.open() is called
 
 #base64 encoded bytestring which contains the favicon
 encoded_string = b'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAASQSURBVHhe7ZpdbBRVFMf/K61AgFKxfegmoA9SC0E0JGCIBqg0giH6Ag+KL2BEjU3E+PEkbJAHNDHVaAL4EYUH06A+iAFMSSG8WROFAm2wHyDGpppAhLZJW+luOZ7LnAnb7el054tpnPml/5x77+69e8+ZO/djpikC+C++3CU2tiQBEBtbkgCIjS1JAMTGliQAYmNLEgCxsSUJgNjYcmdOg6WlwPp1wIYNQHU1h32afMA/ffOmpBmTtntDJp3XtdFRSTCm3P7M2MI2bG61l/e9N94EenqsvI00FZ7q1hJ1dhCN5qLV0SNq/8IdAS+9COzdx1c84jstmwWWLQMu/CYFtwmvZ2tWTw3nDQcPqM4bwhkBd/M939oK1NRIQYQMDAAPcj+uXJGCsYRzebZtmxrOGxoaJnTeEPwImDcP6OywbNT09loXYmhYCsYT/AjI7Jgazht2vOPovCHYEWDW+PPnrHXfiWPHLOVyUhAQ5eXAqlW851gPtJ0Hlj/K3k3inglAYPrhe30NzlfbOaLp0/X6QenhpUQrV+qfFSi4ADxRqzucr6FBq3Na/YgUTABKSohaz+hO5+v17Xr9CBVMALZu0R3OVy5LVD5Xrx+h/E+Cs2cDHReAqrQUOGAOIqd/9Tn5cXd7/wb27we6L0qZD+xIeFZmp37Fw9ZAnzXvaH1yIX8jIF3FV583PbNmScEdpu868AgfcgqPuC7wtxHavTs65w3l9wA7eePlA+8jIM33/B+XgWn2w42IuNjNh51FknGP9xGwaWP0zhsGByXhDe8BqF0jCY+Yjh89AjQ28ra1beyjLDc0HpKER8wt4EktP+mzczH67luiysqx7VUvJPrqS6KRG3odTd1dvrfV3gOw7kmi69f0jjmp4QOiVEpv0+jxx4h6/tTrFuqZp/U2XMjfMjhnDrBiBW+GilwJRrJAU5P10zZVvJS+8jJw6hTQ0gLcGAGWPmQ9UXKiuZlPfU9Jxgd2JCJRaSnR6V9uX9E+HlHfHCLalRl7pQs1PES0qEZv06WiDcBzz+oOTqaPPtTb86BwngkWS12dJFxw9Sqw613J+Ke4ACxZAiyYL5kAqbhXEi7IZID+fsn4Z/JJ0Gx2fubJafFiYN9e3vt3WuWjsm7fGkgOa7h5DWbW+JMn+BT3lxQK9fXAJx9LpgjOngWW86Trdc+gYd8LE+r5zfp96FYD/USb+Z7Pb9ssh5s2EjX9SPTvsF7PVm7EWiLz6wcg5wDMmEF0+ZLeIa96/z1r9i/8rYoKou2vEWXZUa1e49fj6wQg5wC8/ZbeGb9qbyN6YSvRgvlEM2cSzS0jquWzffNx/fvX/iFKp/U++tTEc0BlBdDVBZSVSUFImNfe5v1hKiUFCvWvAp9+LplgmXgVMC8VwnbeYCZZJ+fNgemzLyQTPPoIWPgA0N4OlJRIQUSYU+JqPnUGuOwVoo+APXuid/4EL5treaMUovOG8SPg/vuAAwedh2VYmH9k+P0ScPgwH5qOW9NUyPg7Df4PiPYsMAVIAiA2tiQBEBtbkgCIjS1JAMTGliQAYmNLEgCxMQX4DxvJZiayMybCAAAAAElFTkSuQmCC'
@@ -362,7 +363,7 @@ defaultValNames = [
 
 
 def pause(slID):
-    if ser is None:
+    if not ser.is_open:
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
     else:
         msg = [
@@ -379,7 +380,7 @@ def pause(slID):
         ser.reset_input_buffer()
 
 def resume(slID):
-    if ser is None:
+    if not ser.is_open:
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
     else:
         msg = [
@@ -396,7 +397,7 @@ def resume(slID):
         ser.reset_input_buffer()
 
 def control(slID, controlIndex, value):
-    if ser is None:
+    if not ser.is_open:
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
     else:
         msg = [
@@ -413,7 +414,7 @@ def control(slID, controlIndex, value):
         ser.reset_input_buffer()
 
 def pauseAll():
-    if ser is None:
+    if not ser.is_open:
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
     else:
         msg = [
@@ -430,7 +431,7 @@ def pauseAll():
         ser.reset_input_buffer()
 
 def resumeAll():
-    if ser is None:
+    if not ser.is_open:
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
     else:
         msg = [
@@ -509,7 +510,7 @@ def openSession():
             file.close()
         update()
         
-def connect():  #TODO: Indicate when the program is connected, and add the ability to disconnect
+def connect(): #TODO: test this more thoroughly 
     global ser
     #setup the new menu
     connector = T.apply(Toplevel())
@@ -517,10 +518,17 @@ def connect():  #TODO: Indicate when the program is connected, and add the abili
     connector.grab_set() #make window modal
     connector.focus_set()
 
-    currentPort = 0
+    currentPortSelection = 0
 
-    #Add ports to dropdown menu
+    #Add ports to dropdown menu, refresh interactable widgets
     def getCOMs():
+        if ser.is_open:
+            portHint.config(text="Connected to %s" % ser.port)
+            disconnectButton.config(state=NORMAL)
+        else:
+            portHint.config(text="Not Connected")
+            disconnectButton.config(state=DISABLED)
+
         select(0)  #reset dropdown menu
         dropdown.menu.delete(0, END)
         for ii in range(256): #Scan all serial ports, and include all available ports in portList
@@ -532,11 +540,11 @@ def connect():  #TODO: Indicate when the program is connected, and add the abili
                 pass
 
     #select is called every time a new option is chosen from the dropdown menu.  It updates the window to the new state
-    def select(port):
-        nonlocal currentPort
-        currentPort = port
-        if currentPort > 0 and currentPort <= 256:
-            dropdown.config(text='COM%s' % (currentPort)+" \U000025BC")
+    def select(portSelection):
+        nonlocal currentPortSelection
+        currentPortSelection = portSelection
+        if currentPortSelection > 0 and currentPortSelection <= 256:
+            dropdown.config(text='COM%s' % (currentPortSelection)+" \U000025BC")
             connectButton.config(state=NORMAL)                       
         else:
             dropdown.config(text="Select a COM port \U000025BC")
@@ -547,9 +555,9 @@ def connect():  #TODO: Indicate when the program is connected, and add the abili
         global ser
         global serTimeout
         try:
-            if not ser is None:
-                ser.close()
-            ser = serial.Serial(port = 'COM%s' % (currentPort), baudrate=38400, parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=serTimeout)
+            ser.port = 'COM%s' % (currentPortSelection)
+            if not ser.is_open:
+                ser.open()
             ser.reset_input_buffer()
         except serial.serialutil.SerialException:
             messagebox.showerror("Power Tools Test Manager", "Could not connect to COM port", parent=root.focus_get())
@@ -557,6 +565,12 @@ def connect():  #TODO: Indicate when the program is connected, and add the abili
             update()
             connector.destroy()
 
+    def disconnect():
+        global ser
+        if ser.is_open:
+            ser.close()
+        update()
+        connector.destroy()
 
     #draw port chooser dropdown
     dropdown = T.apply(Menubutton(connector, width=17, relief=RAISED))
@@ -564,15 +578,22 @@ def connect():  #TODO: Indicate when the program is connected, and add the abili
     dropdown["menu"] = dropdown.menu
     dropdown.grid(row=0, column=0, padx=5, pady=5)
 
+    portHint = T.apply(Label(connector, width=17))
+    portHint.grid(row=1, column=0, padx=5, pady=5)
+
     #refresh button
-    T.apply(Button(connector, text='Rescan COM Ports', command=getCOMs)).grid(row=0, column=1, padx=5, pady=5)
+    T.apply(Button(connector, text='Rescan COM Ports', command=getCOMs)).grid(row=0, column=2, padx=5, pady=5)
 
     #connect Button
     connectButton = T.apply(Button(connector, text='Connect', command=connect))
-    connectButton.grid(row=0, column=2, padx=5, pady=5)
+    connectButton.grid(row=0, column=1, padx=5, pady=5)
+
+    #disconnect Button
+    disconnectButton = T.apply(Button(connector, text='Disconnect', command=disconnect))
+    disconnectButton.grid(row=1, column=1, padx=5, pady=5)
 
     #close button
-    T.apply(Button(connector, text='Cancel', command=connector.destroy)).grid(row=0, column=3, padx=5, pady=5)
+    T.apply(Button(connector, text='Cancel', command=connector.destroy)).grid(row=1, column=2, padx=5, pady=5)
 
     getCOMs() #scan ports to populate list for the first time
 
@@ -1424,7 +1445,7 @@ def openControls(InitialTestNum=0):
     if len(tests) == 0:
         messagebox.showerror("Power Tools Test Manager", "There are no stations to control", parent=root.focus_get())
         return
-    if ser is None:
+    if not ser.is_open:
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
         return
     #setup the new menu
@@ -1542,7 +1563,7 @@ def pauseTests():
     if len(tests) == 0:
         messagebox.showerror("Power Tools Test Manager", "There are no stations to control", parent=root.focus_get())
         return
-    if ser is None:
+    if not ser.is_open:
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
         return
     #setup the new menu
@@ -1935,7 +1956,7 @@ def update():
     T.apply([fileMenu, functionsMenu, viewMenu, lockSubMenu, controlsMenu])
     # T.apply(testCommentsMenu)
     
-    if locked or len(tests) == 0 or ser is None:
+    if locked or len(tests) == 0 or not ser.is_open:
         pauseAllButton.config(state=DISABLED)
         resumeAllButton.config(state=DISABLED)
     else:
@@ -2177,7 +2198,7 @@ currTestPoll = 0
 #main loop for recieving checking up and recieving from PLCs and continuing the GUI
 #if the loop encounters an error while parsing three times in a row, it will mark the test as offline and proceed to poll the next test
 while(running): #root.state() == 'normal'):
-    if not ser is None: #If connected to a serial port 
+    if ser.is_open: #If connected to a serial port 
         if currTestPoll < len(tests) and tests[currTestPoll].testNum > 0 and tests[currTestPoll].testNum <= 247:
             #ensure that the index is not out of bounds, which could possibly be caused by deleting tests, and check if test is associated with a valid slave ID before retrieving
             #print(f'{tests[currTestPoll].testNum:03d}')
@@ -2204,7 +2225,6 @@ while(running): #root.state() == 'normal'):
                     retryCount += 1
             except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
                 ser.close()
-                ser = None
                 currTestPoll = 0
                 retryCount = 0
                 for oo in tests:
@@ -2220,6 +2240,6 @@ while(running): #root.state() == 'normal'):
     root.update() #maintain root window
     
 root.destroy()
-if not ser is None:
+if ser.is_open:
     ser.close()
 #root.mainloop()

@@ -498,13 +498,7 @@ def openSession():
                         [oo["controls"][ii]["name"] for ii in range(numberOfControls)]
                         ))
             except TypeError as e: #old version file support
-                for oo in testList:
-                    if len(oo) >= 5: #prevent oob errors
-                        tests.append(Test(oo[0], oo[1], oo[2], oo[3], oo[4]))
-                    elif len(oo) >= 4: #0.5 version file support
-                        tests.append(Test(oo[0], oo[1], oo[2], oo[3]))
-                    else:
-                        messagebox.showerror("Power Tools Test Manager", "Incompatible File", parent=root.focus_get())
+                messagebox.showerror("Power Tools Test Manager", "Incompatible File", parent=root.focus_get())
     finally:
         if not file is None:
             file.close()
@@ -1882,6 +1876,27 @@ menubar.add_cascade(label="Control", menu=controlsMenu)
 # menubar.add_cascade(label="Test Comments", menu=testCommentsMenu)
 
 root.config(menu=menubar)
+
+#configure from config file on startup
+try:
+    conf = json.load(open("config.json"))
+    if "port" in conf:
+        if isinstance(conf["port"], str):
+            if len(conf["port"]) > 3:
+                if conf["port"][:3] == "COM" and conf["port"][3:].isdigit():
+                    conf["port"] = int(conf["port"][3:])
+
+        if isinstance(conf["port"], int):
+            if conf["port"] > 0 and conf["port"] <= 256:
+                try:
+                    ser.port = 'COM%s' % (conf["port"])
+                    ser.open()
+                except serial.serialutil.SerialException:
+                    ser.close()
+                    pass
+
+except Exception as e:
+    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
 
 #Draws the screen with the current parameters
 def update():

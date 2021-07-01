@@ -1,0 +1,5 @@
+{
+	"url": "http://localhost:5000/",
+	"addAll": true,
+	"port": "COM1"
+}

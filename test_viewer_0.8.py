@@ -18,7 +18,7 @@ pollPeriod = 0.01 #in seconds
 
 pollTimeout = 0.01
 
-main_url = "http://localhost:5000/"
+main_url = ""
 
 numberOfData = 32
 numberOfControls = 32
@@ -315,7 +315,7 @@ def connect():
         global main_url
         global pollTimeout
         try:
-            get = requests.get(main_url, timeout = pollTimeout)
+            get = requests.get(urlEntry.get(), timeout = pollTimeout)
             get.raise_for_status()
             if not get.json()['app'] == "Power Tools Test Manager":
                 raise Exception('wrong app')
@@ -325,8 +325,8 @@ def connect():
         #TODO: allow url mutation after displaying error?
         except requests.exceptions.ConnectionError as e:
             messagebox.showerror("Power Tools Test Viewer", "That address could not be reached", parent=root.focus_get())
-        except socket.gaierror as e:
-            messagebox.showerror("Power Tools Test Viewer", "That address could not be resolved as valid", parent=root.focus_get())
+        except requests.exceptions.MissingSchema as e:
+            messagebox.showerror("Power Tools Test Viewer", "The address supplied is not a valid url", parent=root.focus_get())
         except requests.exceptions.HTTPError as e:
             messagebox.showerror("Power Tools Test Viewer", "That address provided a bad response (Type H)", parent=root.focus_get())
         except requests.exceptions.Timeout as e:
@@ -837,6 +837,28 @@ viewMenu.add_command(label="Show Controls", command=openControls)
 menubar.add_cascade(label="View", menu=viewMenu)
 
 root.config(menu=menubar)
+
+#configure on start up from config file
+try:
+    conf = json.load(open("config.json"))
+    if "url" in conf:
+        if isinstance(conf['url'], str):
+            main_url=conf['url']
+
+    if "addAll" in conf:
+        if isinstance(conf['addAll'], bool):
+            if conf['addAll']:
+                try:
+                    get = requests.get(main_url + 'index')
+                    for ii in range(len(get.json())):
+                        tests.append(Test(get.json()[ii]['url'], get.json()[ii]['number'], get.json()[ii]['title'], get.json()[ii]['subtitle']))
+                except Exception as e:
+                    pass
+
+except Exception as e:
+    raise
+    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
+
 
 #Draws the screen with the current parameters
 def update():

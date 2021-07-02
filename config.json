@@ -1,5 +1,8 @@
 {
 	"url": "http://localhost:5000/",
 	"addAll": true,
-	"port": "COM1"
+	"port": null,
+	"file": ["C:/Users/np0083/Documents/GitHub/test_man_0.8/demo 4.json"],
+	"lock": false,
+	"pass": "hello"
 }

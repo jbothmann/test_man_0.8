@@ -841,10 +841,14 @@ root.config(menu=menubar)
 #configure on start up from config file
 try:
     conf = json.load(open("config.json"))
+
+    #sets the main url on startup.  "url" accepts a string value, which becomes the main url
     if "url" in conf:
         if isinstance(conf['url'], str):
-            main_url=conf['url']
+            main_url = conf['url']
 
+    #determines whether the program attempts to add all the stations from the server on startup.  "addAll" accepts a boolean value.
+    #If true, the program will attempt to contact the server and add all station
     if "addAll" in conf:
         if isinstance(conf['addAll'], bool):
             if conf['addAll']:
@@ -854,6 +858,10 @@ try:
                         tests.append(Test(get.json()[ii]['url'], get.json()[ii]['number'], get.json()[ii]['title'], get.json()[ii]['subtitle']))
                 except Exception as e:
                     pass
+
+    #sets the display theme on startup.  "theme accepts a string value.  If the value matches the name of a loaded theme, that theme will be selected #TODO
+    if "theme" in conf:
+        pass
 
 except Exception as e:
     raise

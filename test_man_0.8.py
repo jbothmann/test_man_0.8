@@ -46,8 +46,8 @@ def exitProgram():
 root.protocol('WM_DELETE_WINDOW', exitProgram) #Override close button with exitProgram
 
 #keep track of if the software is locked, if it is locked by password, and the password itself
-locked = 0
-passLocked = 0
+locked = False
+passlocked = False
 password = ""
 
 #class Theme, which holds values for the colors and styles that the program should use for all widgets.  Default values approximate Tkinter defaults.
@@ -482,27 +482,50 @@ def openSession():
         messagebox.showerror("Power Tools Test Manager", "Could not open file", parent=root.focus_get())
     else:
         if not file is None:
-            testList = json.load(file)
             try:
-                for oo in testList:
-                    tests.append(Test(
-                        oo["number"], 
-                        oo["title"], 
-                        oo["subtitle"], 
-                        [[
-                            oo["data"][ii]["name"], 
-                            oo["data"][ii]["units"], 
-                            0, 
-                            oo["data"][ii]["show"] 
-                            ]for ii in range(numberOfData)], 
-                        [oo["controls"][ii]["name"] for ii in range(numberOfControls)]
-                        ))
-            except TypeError as e: #old version file support
-                messagebox.showerror("Power Tools Test Manager", "Incompatible File", parent=root.focus_get())
+                newTests = parseJSONsession(json.load(file)) #call helper function
+                tests.extend(newTests)
+            except Exception as e: #This mostly handles when file isn't correct JSON
+                messagebox.showerror("Power Tools Test Manager", "Incorrect File Type", parent=root.focus_get())
     finally:
         if not file is None:
             file.close()
         update()
+
+#helper function for openSession, that robustly parses the loaded JSON session representation and returns a list of Test objects
+def parseJSONsession(s):
+    if not isinstance(s, list): #If the json object is not a list, turn it into one for simpler parsing
+        s = [s]
+
+    newTests = [] #add new Test objects to this list to be returned
+    for oo in s:
+        kwargs = {} #enumerate kwargs that will be passed to the Test object initializer
+        if "number" in oo:
+            if isinstance(oo["number"], int):
+                kwargs["address"] = oo["number"]
+
+        if "title" in oo:
+            if isinstance(oo["title"], str):
+                kwargs["name"] = oo["title"]
+
+        if "subtitle" in oo:
+            if isinstance(oo["subtitle"], str):
+                kwargs["serial"] = oo["subtitle"]
+
+        #data and controls arguments are not parsed thoroughly here, because they are already handled by the Test object initializer
+        if "data" in oo: 
+            if isinstance(oo["data"], list):
+                kwargs["data"] = oo["data"]
+
+        if "controls" in oo:
+            if isinstance(oo["controls"], list):
+                kwargs["controls"] = oo["controls"]
+
+        newTests.append(Test(**kwargs))
+
+    return newTests
+
+
         
 def connect(): #TODO: test this more thoroughly 
     global ser
@@ -1137,17 +1160,17 @@ def writeToFile():
 #not protected by password
 def lockDisplay():
     global locked
-    global passLocked
+    global passlocked
     global password
-    locked = 1
-    passLocked = 0
+    locked = True
+    passlocked = False
     update()
 
 #lockDisplayWithPass, will make most functions and buttons unusable
 #prompts the user to submit a password
 def lockDisplayWithPass():
     global locked
-    global passLocked
+    global passlocked
     global password
     #setup the new menu
     locker = T.apply(Toplevel())
@@ -1160,10 +1183,10 @@ def lockDisplayWithPass():
     
     def lockWithPass():
         global locked
-        global passLocked
+        global passlocked
         global password
-        locked = 1
-        passLocked = 1
+        locked = True
+        passlocked = True
         password = passEntry.get()
         update()
         locker.destroy()
@@ -1171,10 +1194,10 @@ def lockDisplayWithPass():
     #deprecated
     def lockWithoutPass():
         global locked
-        global passLocked
+        global passlocked
         global password
-        locked = 1
-        passLocked = 0
+        locked = True
+        passlocked = True
         update()
         locker.destroy()
         
@@ -1195,10 +1218,10 @@ def lockDisplayWithPass():
 #or prompts for a password
 def unlockDisplay():
     global locked
-    global passLocked
+    global passlocked
     global password
-    if not passLocked:
-        locked = 0
+    if not passlocked:
+        locked = False
         update()
     else:
         #setup the new menu
@@ -1212,11 +1235,11 @@ def unlockDisplay():
 
         def unlock():
             global locked
-            global passLocked
+            global passlocked
             global password
             if passEntry.get() == password:
-                locked = 0
-                passLocked = 0
+                locked = False
+                passlocked = False
                 password = ""
                 update()
                 unlocker.destroy()
@@ -1880,6 +1903,8 @@ root.config(menu=menubar)
 #configure from config file on startup
 try:
     conf = json.load(open("config.json"))
+
+    #connect to a COM port on startup.  "port" accepts a value between 1 and 256, in the form of an int or a string "COM<value>"
     if "port" in conf:
         if isinstance(conf["port"], str):
             if len(conf["port"]) > 3:
@@ -1894,6 +1919,33 @@ try:
                 except serial.serialutil.SerialException:
                     ser.close()
                     pass
+
+    #open one or more session files on startup.  "file" accepts a string filepath, or a list of string filepaths
+    if "file" in conf:
+        if isinstance(conf["file"], str):
+            conf["file"] = [conf["file"]]
+        if isinstance(conf["file"], list):
+            for oo in conf["file"]:
+                if isinstance(oo, str):
+                    if os.path.isfile(oo):
+                        try:
+                            tests.extend(parseJSONsession(json.load(open(oo))))
+                        except Exception as e:
+                            pass
+
+    #locks the display on startup. "lock" accepts a boolean value, which locks the screen if true.  "pass" accepts a string value, which sets the password
+    if "lock" in conf:
+        if isinstance(conf["lock"], bool):
+            if conf["lock"]:
+                locked = True
+                if "pass" in conf:
+                    if isinstance(conf["pass"], str):
+                        passlocked = True
+                        password = conf["pass"]
+                
+    #sets the display theme on startup.  "theme accepts a string value.  If the value matches the name of a loaded theme, that theme will be selected #TODO
+    if "theme" in conf:
+        pass
 
 except Exception as e:
     messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())

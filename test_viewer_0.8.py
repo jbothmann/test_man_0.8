@@ -11,6 +11,8 @@ import copy
 import os
 import string
 import random
+import tkTheme #Local Import
+import tkinter.font
 
 version = "0.8"
 
@@ -48,55 +50,15 @@ locked = 0
 passLocked = 0
 password = ""
 
-#class Theme, which holds values for the colors and styles that the program should use for all widgets.  Default values approximate Tkinter defaults.
-class Theme:
-    def __init__(self, colorsTitle="Default Gray", fontSizeTitle="Medium", fontTitle="Sans-Serif", bg="gray95", fg="black", contrastbg="white", contrastfg="black", selectbg="#00a2ed", selectfg="white", contrastselectbg="#00a2ed", contrastselectfg="white", fontSize=9, font="Helvetica"):
-        #inititalize theme identifiers
-        self.colorsTitle = colorsTitle
-        self.fontSizeTitle = fontSizeTitle
-        self.fontTitle = fontTitle
+#create an empty list, to be filled with user-specified Theme objects from the themes.json config file.  Population occurs in startup configuration phase
+themes = []
+#create an empty list, to be filled with user-specified fonts from the fonts.json config file.  Population occurs in startup configuration phase
+families = []
+#create an empty list, to be filled with user-specified text sizes from the fonts.json config file.  Population occurs in startup configuration phase
+sizes = []
 
-        #inititalize values
-        self.bg = bg #colors to be used for most elements
-        self.fg = fg
-        self.contrastbg = contrastbg #colors to be used for elements that need to stand out from the background
-        self.contrastfg = contrastfg
-        self.selectbg = selectbg #colors used when highlighting text
-        self.selectfg = selectfg
-        self.contrastselectbg = contrastselectbg #colors used when highlighting text on contrast element
-        self.contrastselectfg = contrastselectfg
-        self.fontSize = fontSize
-        self.font = font
-
-    #Theme.apply, passing this method a common widget will automatically reconfigure its color and font to fit the theme
-    def apply(self, widget):
-        if isinstance(widget, list):  #if passed a list of widgets, recursively handle all widgets
-            for oo in widget:
-                self.apply(oo)
-        if isinstance(widget, Tk) or isinstance(widget, Toplevel):
-            widget.config(bg=self.bg)
-        elif isinstance(widget, Frame):
-            widget.config(bg=self.bg)
-        elif isinstance(widget, LabelFrame):
-            widget.config(bg=self.bg, fg=self.fg, font=(self.font, self.fontSize+2))
-        elif isinstance(widget, Label):
-            widget.config(bg=self.bg, fg=self.fg, font=(self.font, self.fontSize))
-        elif isinstance(widget, Button) or isinstance(widget, Menubutton):
-            widget.config(bg=self.bg, fg=self.fg, activebackground=self.bg, activeforeground=self.fg, font=(self.font, self.fontSize))
-        elif isinstance(widget, Entry):
-            widget.config(bg=self.contrastbg, fg=self.contrastfg, selectbackground=self.contrastselectbg, selectforeground=self.contrastselectfg, font=(self.font, self.fontSize))
-        elif isinstance(widget, SelectLabel): #This conditional must come before Text, because SelectLabel extends Text
-            widget.config(bg=self.bg, fg=self.fg, selectbackground=self.selectbg, selectforeground=self.selectfg, font=(self.font, self.fontSize))
-        elif isinstance(widget, Text):
-            widget.config(bg=self.contrastbg, fg=self.contrastfg, selectbackground=self.contrastselectbg, selectforeground=self.contrastselectfg, font=(self.font, self.fontSize))
-        elif isinstance(widget, Checkbutton) or isinstance(widget, Radiobutton):
-            widget.config(bg=self.bg, fg='black', activebackground=self.bg, activeforeground=self.bg, font=(self.font, self.fontSize))
-        elif isinstance (widget, Menu):
-            widget.config(bg=self.contrastbg, fg=self.contrastfg, activebackground=self.contrastselectbg, activeforeground=self.contrastselectfg, disabledforeground=None, font=(self.font, self.fontSize))
-        return widget
-
-#create a Theme object
-T = Theme()
+#create a ThemeAndFont object, which we will use to paint our program
+T = tkTheme.ThemeAndFont()
 
 #class Test, holds all information about one test
 class Test:
@@ -170,7 +132,7 @@ class Test:
         #apply theme to all widgets
         T.apply([self.labelWidgetFrame, self.stationNumLabel, self.connectionHint, self.frame, self.dataLabel, self.statusIndicator, self.button2])
 
-        self.stationNumLabel.config(text="Station " + str(self.testNum), font=(T.font, T.fontSize+2))
+        self.stationNumLabel.config(text="Station " + str(self.testNum), font=(T.family, T.size+2))
         self.connectionHint.config(fg = 'red')
         self.frame.grid(row=r, column=c, pady=3, padx=3) #regrid the frame
 
@@ -189,7 +151,7 @@ class Test:
             self.statusIndicator.config(text="\U00002B24   In Progress", fg="green")
             self.button2.config(text="Show Controls", command=lambda: openControls(self.testNum), state=NORMAL)
         elif self.status == Test.PAUSED:
-            self.statusIndicator.config(text="\U00002B24   Paused", fg=T.fg)
+            self.statusIndicator.config(text="\U00002B24   Paused", fg=T.theme.fg)
             self.button2.config(text="Show Controls", command=lambda: openControls(self.testNum), state=NORMAL)
         elif self.status == Test.STOPPED:
             self.statusIndicator.config(text="\U00002B24   Stopped", fg="orange")
@@ -586,7 +548,7 @@ def openControls(InitialTestNum=0):
     for ii in range(numberOfControls):
         numLabel.append(T.apply(Label(midFrame, text=str(ii+1))))
         controlStatusLabels.append(T.apply(Label(midFrame, width=8)))
-        controlNameLabels.append(SelectLabel(midFrame, width=14, height=1, bg=T.contrastbg, fg=T.contrastfg, font=(T.font, T.fontSize), justify=LEFT, shrink=False))
+        controlNameLabels.append(SelectLabel(midFrame, width=14, height=1, bg=T.theme.contrast_bg, fg=T.theme.contrast_fg, font=(T.family, T.size), justify=LEFT, shrink=False))
 
         numLabel[ii].grid(row=(ii%16+3), column=(int(ii/16)*4))
         controlStatusLabels[ii].grid(row=(ii%16+3), column=(int(ii/16)*4+2))
@@ -611,7 +573,7 @@ def openControls(InitialTestNum=0):
                         if tests[currentTestIndex].controls[ii][1]:
                             controlStatusLabels[ii].config(text="ON", fg="green")
                         else:
-                            controlStatusLabels[ii].config(text="OFF", fg=T.fg)
+                            controlStatusLabels[ii].config(text="OFF", fg=T.theme.fg)
                 else:
                     controlNameLabels[ii].config(text=" ")
                     controlStatusLabels[ii].config(text=" ")        
@@ -643,13 +605,12 @@ def openControls(InitialTestNum=0):
     tl.update_idletasks()
     tl.minsize(width=max(tl.winfo_reqwidth(),300), height=max(tl.winfo_reqheight(),200))
 
-
-
 #theme():  This function opens a window that will allow the user to select which colors, font, and text size the program uses
 #As new selections are made, this window will be updated to give the user a preview of the theme they have selected
+#TODO: fix select label appearance
 def theme():
     global T
-    #initialize a new Theme() object based on the current global Theme
+    #initialize a new ThemeAndFont() object based on the current global Theme
     newTheme=copy.deepcopy(T)
 
     #setup the new menu
@@ -667,81 +628,18 @@ def theme():
     botFrame = newTheme.apply(Frame(tl, bd=0))
     botFrame.pack(side=BOTTOM)
 
-    terse = newTheme.apply(SelectLabel(topFrame, text="Current Theme: "+newTheme.colorsTitle+", "+newTheme.fontSizeTitle+" "+newTheme.fontTitle))
+    terse = newTheme.apply(SelectLabel(topFrame, text="Current Theme: %s, %i %s" % (newTheme.theme.title, newTheme.size, newTheme.family)))
     terse.pack()
 
     def refresh():
-        newTheme.colorsTitle = colorsVar.get().strip()
-        if newTheme.colorsTitle == "Default Gray":
-            newTheme.bg="gray95"
-            newTheme.fg="black"
-            newTheme.contrastbg="white"
-            newTheme.contrastfg="black"
-            newTheme.selectbg="#00a2ed"
-            newTheme.selectfg="white"
-            newTheme.contrastselectbg=newTheme.selectbg
-            newTheme.contrastselectfg=newTheme.selectfg
-        elif newTheme.colorsTitle == "Monochrome":
-            newTheme.bg="white"
-            newTheme.fg="black"
-            newTheme.contrastbg="gray90"
-            newTheme.contrastfg="black"
-            newTheme.selectbg="gray"
-            newTheme.selectfg="black"
-            newTheme.contrastselectbg=newTheme.selectbg
-            newTheme.contrastselectfg=newTheme.selectfg
-        elif newTheme.colorsTitle == "Mint":
-            newTheme.bg="#dbeed7"
-            newTheme.fg="#3f000f"
-            newTheme.contrastbg="white"
-            newTheme.contrastfg="#3f000f"
-            newTheme.selectbg="#3f000f"
-            newTheme.selectfg="white"
-            newTheme.contrastselectbg=newTheme.selectbg
-            newTheme.contrastselectfg=newTheme.selectfg
-        elif newTheme.colorsTitle == "Night":
-            newTheme.bg="#1d2951"
-            newTheme.fg="white"
-            newTheme.contrastbg="slategray"
-            newTheme.contrastfg="white"
-            newTheme.selectbg="white"
-            newTheme.selectfg="slategray"
-            newTheme.contrastselectbg=newTheme.selectbg
-            newTheme.contrastselectfg=newTheme.selectfg
-        elif newTheme.colorsTitle == "Two-Tone":
-            newTheme.bg="black"
-            newTheme.fg="white"
-            newTheme.contrastbg="white"
-            newTheme.contrastfg="black"
-            newTheme.selectbg="white"
-            newTheme.selectfg="black"
-            newTheme.contrastselectbg="black"
-            newTheme.contrastselectfg="white"
-
-        newTheme.fontSizeTitle = fontSizeVar.get().strip()
-        if newTheme.fontSizeTitle == "Small":
-            newTheme.fontSize = 7
-        elif newTheme.fontSizeTitle == "Medium":
-            newTheme.fontSize = 9
-        elif newTheme.fontSizeTitle == "Large":
-            newTheme.fontSize = 11
-        elif newTheme.fontSizeTitle == "Extra Large":
-            newTheme.fontSize = 13
-
-        newTheme.fontTitle = fontVar.get().strip()
-        if newTheme.fontTitle == "Sans-Serif":
-            newTheme.font = "Helvetica"
-        elif newTheme.fontTitle == "Serif":
-            newTheme.font = "Times"
-        elif newTheme.fontTitle == "Monospaced":
-            newTheme.font = "Courier"
+        newTheme.set(theme=next((oo for oo in themes if oo.title == colorsVar.get()), tkTheme.Theme()), family=fontVar.get(), size=fontSizeVar.get())
 
         newTheme.apply(tl)
         newTheme.apply(topFrame)
         newTheme.apply(midFrame)
         newTheme.apply(botFrame)
-        newTheme.apply(terse)
-        terse.config(text="Current Theme: "+newTheme.colorsTitle+", "+newTheme.fontSizeTitle+" "+newTheme.fontTitle)
+        newTheme.apply(terse) #fix
+        terse.config(text="Current Theme: %s, %i %s" % (newTheme.theme.title, newTheme.size, newTheme.family))
         newTheme.apply([colorsHeader, fontSizeHeader, fontHeader, saveButton, cancelButton])
         for oo in r:
             newTheme.apply(oo)
@@ -751,9 +649,9 @@ def theme():
     r = [] #list of all radiobuttons
     l = [] #list of all accompanying labels
 
-    colorsVar = StringVar(value=newTheme.colorsTitle)
-    colorsOptions = ["Default Gray", "Monochrome", "Mint", "Night", "Two-Tone"]
-    colorsHeader = newTheme.apply(SelectLabel(midFrame, text="Color theme:"))
+    colorsVar = StringVar(value=newTheme.theme.title)
+    colorsOptions = [oo.title for oo in themes]
+    colorsHeader = newTheme.apply(SelectLabel(midFrame, text="Color Theme:"))
     colorsHeader.grid(row=0, column=1, columnspan=1)
 
     for ii in range(len(colorsOptions)):
@@ -763,29 +661,27 @@ def theme():
         r[-1].grid(row=ii+1, column=0)
         l[-1].grid(row=ii+1, column=1)
 
-    fontSizeVar = StringVar(value=newTheme.fontSizeTitle)
-    fontSizeOptions = ["Small", "Medium", "Large", "Extra Large"]
+    fontSizeVar = IntVar(value=newTheme.size)
     fontSizeHeader = newTheme.apply(SelectLabel(midFrame, text="Text Size:"))
-    fontSizeHeader.grid(row=0, column=3, columnspan=1)
+    fontSizeHeader.grid(row=0, column=5, columnspan=1)
 
-    for ii in range(len(fontSizeOptions)):
-        r.append(newTheme.apply(Radiobutton(midFrame, variable=fontSizeVar, value=fontSizeOptions[ii], command=refresh)))
-        l.append(newTheme.apply(SelectLabel(midFrame, text=fontSizeOptions[ii])))
+    for ii in range(len(sizes)):
+        r.append(newTheme.apply(Radiobutton(midFrame, variable=fontSizeVar, value=sizes[ii], command=refresh)))
+        l.append(newTheme.apply(SelectLabel(midFrame, text=str(sizes[ii]))))
+
+        r[-1].grid(row=ii+1, column=4)
+        l[-1].grid(row=ii+1, column=5)
+
+    fontVar = StringVar(value=newTheme.family)
+    fontHeader = newTheme.apply(SelectLabel(midFrame, text="Font Family:"))
+    fontHeader.grid(row=0, column=3, columnspan=1)
+
+    for ii in range(len(families)):
+        r.append(newTheme.apply(Radiobutton(midFrame, variable=fontVar, value=families[ii], command=refresh)))
+        l.append(newTheme.apply(SelectLabel(midFrame, text=families[ii])))
 
         r[-1].grid(row=ii+1, column=2)
         l[-1].grid(row=ii+1, column=3)
-
-    fontVar = StringVar(value=newTheme.fontTitle)
-    fontOptions = ["Sans-Serif", "Serif", "Monospaced"]
-    fontHeader = newTheme.apply(SelectLabel(midFrame, text="Font Family:"))
-    fontHeader.grid(row=len(fontSizeOptions)+1, column=3, columnspan=1)
-
-    for ii in range(len(fontOptions)):
-        r.append(newTheme.apply(Radiobutton(midFrame, variable=fontVar, value=fontOptions[ii], command=refresh)))
-        l.append(newTheme.apply(SelectLabel(midFrame, text=fontOptions[ii])))
-
-        r[-1].grid(row=ii+len(fontSizeOptions)+2, column=2)
-        l[-1].grid(row=ii+len(fontSizeOptions)+2, column=3)
 
 
     def save():
@@ -806,6 +702,8 @@ def theme():
     tl.update_idletasks()
     tl.minsize(width=max(tl.winfo_reqwidth(),300), height=max(tl.winfo_reqheight(),200))
 
+#build window block
+
 #declaring dataFrame, which will hold all test widgets
 dataFrame = LabelFrame(root, bd=0)
 dataFrame.pack(side=TOP)
@@ -818,7 +716,6 @@ hint.pack(side=LEFT)
 verText = Label(ver, text="version " + version)
 verText.pack(side=RIGHT)
 ver.pack(side=BOTTOM, fill='x')
-
 
 #build the windows-style menubar with multiple cascades
 menubar = Menu(root)
@@ -837,6 +734,43 @@ viewMenu.add_command(label="Show Controls", command=openControls)
 menubar.add_cascade(label="View", menu=viewMenu)
 
 root.config(menu=menubar)
+
+#startup configuration block
+
+#add all themes from themes configuration file
+try:
+    themefile = json.load(open("themes.json"))
+    #expects a list of JSON objects with attributes that can be used to initialize Theme objects
+    for kwargs in themefile:
+        themes.append(tkTheme.Theme(**kwargs))
+
+except Exception as e:
+    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from themes file", parent=root.focus_get())
+finally:
+    if len(themes) == 0:
+        themes.append(T.theme) #default theme
+
+#add all font options from font configuration file
+try:
+    fontsfile = json.load(open("fonts.json"))
+    #expects a list of font family names
+    if "families" in fontsfile:
+        if isinstance(fontsfile["families"], list):
+            families.extend([oo for oo in fontsfile["families"] if oo in tkinter.font.families()])
+
+    #expects a list of integer sizes
+    if "sizes" in fontsfile:
+        if isinstance(fontsfile["sizes"], list):
+            sizes.extend([oo for oo in fontsfile["sizes"] if isinstance(oo, int)])
+
+except Exception as e:
+    raise
+    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from fonts file", parent=root.focus_get())
+finally:
+    if len(families) == 0:
+        families.append(T.family) #default font family
+    if len(sizes) == 0:
+        sizes.append(T.size) #default font size
 
 #configure on start up from config file
 try:
@@ -859,13 +793,25 @@ try:
                 except Exception as e:
                     pass
 
-    #sets the display theme on startup.  "theme accepts a string value.  If the value matches the name of a loaded theme, that theme will be selected #TODO
+    #sets the display theme on startup.  "theme" accepts a string value.  If the value matches the name of a loaded theme, that theme will be selected, otherwise it will select the first loaded theme
     if "theme" in conf:
-        pass
+        if isinstance(conf['theme'], str):
+            T.set(theme=next((oo for oo in themes if oo.title == conf['theme']), themes[0]))
+
+    #sets the font family on startup.  "fontFamily" accepts a string value.  If the value is the name of a tkinter supported font, that font will be selected
+    if "fontFamily" in conf:
+        if conf["fontFamily"] in tkinter.font.families():
+            T.set(family=conf["fontFamily"])
+
+    #sets the font size on startup.  "fontSize" accepts an integer value to use as the size of the font
+    if "fontSize" in conf:
+        if isinstance(conf["fontSize"], int):
+            T.set(size=conf["fontSize"])
 
 except Exception as e:
-    raise
     messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
+
+
 
 
 #Draws the screen with the current parameters
@@ -875,8 +821,8 @@ def update():
     global testIndexDict
     #apply appearance theme to main window
     T.apply([root, dataFrame, ver, fileMenu, viewMenu])
-    verText.config(bg=T.bg, fg=T.fg, font=(T.font, T.fontSize-2, "italic"))
-    hint.config(bg=T.bg, fg=T.fg, font=(T.font, T.fontSize-2))
+    verText.config(bg=T.theme.bg, fg=T.theme.fg, font=(T.family, T.size-2, "italic"))
+    hint.config(bg=T.theme.bg, fg=T.theme.fg, font=(T.family, T.size-2))
 
     #forget all children in anticipation of reordering and redrawing them
     for child in dataFrame.winfo_children():

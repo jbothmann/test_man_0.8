@@ -1,0 +1,57 @@
+[
+      {
+            "title": "Default Gray",
+            "bg": "gray94",
+            "fg": "black",
+            "selectbg": "#00a2ed",
+            "selectfg": "white",
+            "contrast_bg": "white",
+            "contrast_fg": "black",
+            "contrast_selectbg": "#00a2ed",
+            "contrast_selectfg": "white"
+      },
+      {
+            "title": "Monochrome",
+            "bg": "white",
+            "fg": "black",
+            "selectbg": "gray",
+            "selectfg": "black",
+            "contrast_bg": "gray90",
+            "contrast_fg": "black",
+            "contrast_selectbg": "gray",
+            "contrast_selectfg": "black"
+      },
+      {
+            "title": "Mint",
+            "bg": "#dbeed7",
+            "fg": "#3f000f",
+            "selectbg": "#3f000f",
+            "selectfg": "white",
+            "contrast_bg": "white",
+            "contrast_fg": "#3f000f",
+            "contrast_selectbg": "#3f000f",
+            "contrast_selectfg": "white"
+      },
+      {
+            "title": "Night",
+            "bg": "#1d2951",
+            "fg": "white",
+            "selectbg": "white",
+            "selectfg": "slate gray",
+            "contrast_bg": "slate gray",
+            "contrast_fg": "white",
+            "contrast_selectbg": "white",
+            "contrast_selectfg": "slate gray"
+      },
+      {
+            "title": "Two-Tone",
+            "bg": "black",
+            "fg": "white",
+            "selectbg": "white",
+            "selectfg": "black",
+            "contrast_bg": "white",
+            "contrast_fg": "black",
+            "contrast_selectbg": "black",
+            "contrast_selectfg": "white"
+      }
+]

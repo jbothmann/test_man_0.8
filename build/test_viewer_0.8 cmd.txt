@@ -1,0 +1,1 @@
+pyinstaller -w -i=snap.ico --add-data themes.json;. --add-data fonts.json;. --add-data config.json;. test_viewer_0.8.py

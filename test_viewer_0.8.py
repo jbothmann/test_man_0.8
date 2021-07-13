@@ -407,15 +407,15 @@ def changeView():
             oo.deselect()
             
     #cancel button
-    T.apply(Button(botFrame, text="Cancel", command=view.destroy).grid(row=0, column=4, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Cancel", command=view.destroy)).grid(row=0, column=4, padx=5, pady=5)
     #save button
-    T.apply(Button(botFrame, text="Save", command=save).grid(row=0, column=3, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Save", command=save)).grid(row=0, column=3, padx=5, pady=5)
     #Select All button
-    T.apply(Button(botFrame, text="Select All", command=selectAll).grid(row=0, column=0, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Select All", command=selectAll)).grid(row=0, column=0, padx=5, pady=5)
     #Deselect All button
-    T.apply(Button(botFrame, text="Deselect All", command=deselectAll).grid(row=0, column=1, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Deselect All", command=deselectAll)).grid(row=0, column=1, padx=5, pady=5)
     #Refresh Button
-    T.apply(Button(botFrame, text="Refresh", command=refresh).grid(row=0, column=2, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Refresh", command=refresh)).grid(row=0, column=2, padx=5, pady=5)
 
     view.update_idletasks()
     view.minsize(width=max(view.winfo_reqwidth(),300), height=max(view.winfo_reqheight(),200))
@@ -691,11 +691,11 @@ def theme():
         tl.destroy()
 
     #save button
-    saveButton = Button(botFrame, text="Save", command=save)
+    saveButton = newTheme(Button(botFrame, text="Save", command=save))
     saveButton.grid(row=0, column=0, padx=5, pady=5)
 
     #cancel button
-    cancelButton = Button(botFrame, text="Cancel", command=tl.destroy)
+    cancelButton = newTheme(Button(botFrame, text="Cancel", command=tl.destroy))
     cancelButton.grid(row=0, column=3, padx=5, pady=5)
 
     #set min window size

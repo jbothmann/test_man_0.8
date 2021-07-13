@@ -6,6 +6,8 @@ from datetime import datetime
 from struct import *
 from time import sleep
 
+import flask
+import flask.json
 import serial
 import types
 import json
@@ -25,6 +27,9 @@ numberOfControls = 32
 
 ser = serial.Serial(port = None, baudrate=38400, parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=serTimeout) 
 #initialize serial connection configuration, without selecting a port.  ser will not open until ser.open() is called
+
+api = flask.Flask(__name__, instance_relative_config=True)
+api.config.from_mapping(SECRET_KEY='dev')
 
 #base64 encoded bytestring which contains the favicon
 encoded_string = b'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAASQSURBVHhe7ZpdbBRVFMf/K61AgFKxfegmoA9SC0E0JGCIBqg0giH6Ag+KL2BEjU3E+PEkbJAHNDHVaAL4EYUH06A+iAFMSSG8WROFAm2wHyDGpppAhLZJW+luOZ7LnAnb7el054tpnPml/5x77+69e8+ZO/djpikC+C++3CU2tiQBEBtbkgCIjS1JAMTGliQAYmNLEgCxsSUJgNjYcmdOg6WlwPp1wIYNQHU1h32afMA/ffOmpBmTtntDJp3XtdFRSTCm3P7M2MI2bG61l/e9N94EenqsvI00FZ7q1hJ1dhCN5qLV0SNq/8IdAS+9COzdx1c84jstmwWWLQMu/CYFtwmvZ2tWTw3nDQcPqM4bwhkBd/M939oK1NRIQYQMDAAPcj+uXJGCsYRzebZtmxrOGxoaJnTeEPwImDcP6OywbNT09loXYmhYCsYT/AjI7Jgazht2vOPovCHYEWDW+PPnrHXfiWPHLOVyUhAQ5eXAqlW851gPtJ0Hlj/K3k3inglAYPrhe30NzlfbOaLp0/X6QenhpUQrV+qfFSi4ADxRqzucr6FBq3Na/YgUTABKSohaz+hO5+v17Xr9CBVMALZu0R3OVy5LVD5Xrx+h/E+Cs2cDHReAqrQUOGAOIqd/9Tn5cXd7/wb27we6L0qZD+xIeFZmp37Fw9ZAnzXvaH1yIX8jIF3FV583PbNmScEdpu868AgfcgqPuC7wtxHavTs65w3l9wA7eePlA+8jIM33/B+XgWn2w42IuNjNh51FknGP9xGwaWP0zhsGByXhDe8BqF0jCY+Yjh89AjQ28ra1beyjLDc0HpKER8wt4EktP+mzczH67luiysqx7VUvJPrqS6KRG3odTd1dvrfV3gOw7kmi69f0jjmp4QOiVEpv0+jxx4h6/tTrFuqZp/U2XMjfMjhnDrBiBW+GilwJRrJAU5P10zZVvJS+8jJw6hTQ0gLcGAGWPmQ9UXKiuZlPfU9Jxgd2JCJRaSnR6V9uX9E+HlHfHCLalRl7pQs1PES0qEZv06WiDcBzz+oOTqaPPtTb86BwngkWS12dJFxw9Sqw613J+Ke4ACxZAiyYL5kAqbhXEi7IZID+fsn4Z/JJ0Gx2fubJafFiYN9e3vt3WuWjsm7fGkgOa7h5DWbW+JMn+BT3lxQK9fXAJx9LpgjOngWW86Trdc+gYd8LE+r5zfp96FYD/USb+Z7Pb9ssh5s2EjX9SPTvsF7PVm7EWiLz6wcg5wDMmEF0+ZLeIa96/z1r9i/8rYoKou2vEWXZUa1e49fj6wQg5wC8/ZbeGb9qbyN6YSvRgvlEM2cSzS0jquWzffNx/fvX/iFKp/U++tTEc0BlBdDVBZSVSUFImNfe5v1hKiUFCvWvAp9+LplgmXgVMC8VwnbeYCZZJ+fNgemzLyQTPPoIWPgA0N4OlJRIQUSYU+JqPnUGuOwVoo+APXuid/4EL5treaMUovOG8SPg/vuAAwedh2VYmH9k+P0ScPgwH5qOW9NUyPg7Df4PiPYsMAVIAiA2tiQBEBtbkgCIjS1JAMTGliQAYmNLEgCxMQX4DxvJZiayMybCAAAAAElFTkSuQmCC'
@@ -104,6 +109,7 @@ class Test:
         self.serial = serial #subtitle for the station
         self.status = "Offline"
         self.data = [] #data variables, a len 32 list of 4-lists, including a string defining the datum, a string defining the units, the number datum, and a boolean which determines if the datum is used
+        
         #repair passed data if it is unsuitable or absent
         if not isinstance(data, list):
             data = [
@@ -123,12 +129,32 @@ class Test:
                         if isinstance(data[ii][1], str):
                             self.data[ii][1] = data[ii][1] #set datum unit, string
                            
-                    if len(data[ii]) > 2:
-                        self.data[ii][2] = data[ii][2] #set datum value, currently accepts any value type
+                    #setting data value not accepted
+                    #if len(data[ii]) > 2:
+                    #    self.data[ii][2] = data[ii][2] #set datum value, currently accepts any value type
                            
                     if len(data[ii]) > 3:
                         if isinstance(data[ii][3], bool):
                             self.data[ii][3] = data[ii][3] #set show datum, boolean
+
+                elif isinstance(data[ii], dict):
+                    if "name" in data[ii]:
+                        if isinstance(data[ii]["name"], str):
+                            self.data[ii][0] = data[ii]["name"] #set datum name, string
+                            self.data[ii][3] = True #assume the data is used if it has a name
+
+                    if "units" in data[ii]:
+                        if isinstance(data[ii]["units"], str):
+                            self.data[ii][1] = data[ii]["units"] #set datum unit, string
+
+                    #setting data value not accepted
+                    # if "float" in data[ii]:
+                    #     if isinstance(data[ii]["float"], float):
+                    #         self.data[ii][2] = data[ii]["float"] #set value, python float
+
+                    if "show" in data[ii]:
+                        if isinstance(data[ii]["show"], bool):
+                            self.data[ii][3] = data[ii]["show"] #set show datum, boolean
                            
                 elif isinstance(data[ii], str):
                     self.data[ii][0] = data[ii] #set datum name if only a string name is given
@@ -138,6 +164,7 @@ class Test:
         self.controls = [] #controls, a len 32 list of 2-lists, including a string name which communicates what each control does, and a boolean value
         if not isinstance(controls, list):
             controls = []
+
         #handle given labels, ensuring that each entry is a proper 2-list string
         for ii in range(numberOfControls):
             self.controls.append(["", False])
@@ -146,6 +173,12 @@ class Test:
                     if len(controls[ii]) > 0:
                         if isinstance(controls[ii][0], str):
                             self.controls[ii][0] = controls[ii][0] #set control label, string
+
+                if isinstance(controls[ii], dict):
+                    if "name" in controls[ii]:
+                        if isinstance(controls[ii]["name"], str):
+                            self.controls[ii][0] = controls[ii]["name"] #set control label, string
+
                 elif isinstance(controls[ii], str):
                     self.controls[ii][0] = controls[ii] #set control label if only a string name is given     
 
@@ -311,7 +344,7 @@ tests = []
 testIndexDict = {}
 
 
-#Default named values when creating a new test using the gui dialog
+#Default named values when creating a new test using the gui dialog #TODO: is this needed?
 defaultValNames = [
     "Cycles",
     "Time Elapsed",
@@ -323,6 +356,7 @@ defaultValNames = [
     "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
     ]
 
+#station control functions block
 
 def pause(slID):
     if not ser.is_open:
@@ -408,6 +442,8 @@ def resumeAll():
         ser.write(bytes(msg))
         sleep(serTimeout)
         ser.reset_input_buffer()
+
+#application functions block
                                   
 def saveSession():
     try:
@@ -486,8 +522,6 @@ def parseJSONsession(s):
         newTests.append(Test(**kwargs))
 
     return newTests
-
-
         
 def connect(): #TODO: test this more thoroughly 
     global ser
@@ -1017,13 +1051,13 @@ def changeView():
             c[i].deselect()
             
     #cancel button
-    T.apply(Button(botFrame, text="Cancel", command=view.destroy).grid(row=0, column=3, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Cancel", command=view.destroy)).grid(row=0, column=3, padx=5, pady=5)
     #save button
-    T.apply(Button(botFrame, text="Save", command=save).grid(row=0, column=2, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Save", command=save)).grid(row=0, column=2, padx=5, pady=5)
     #Select All button
-    T.apply(Button(botFrame, text="Select All", command=selectAll).grid(row=0, column=0, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Select All", command=selectAll)).grid(row=0, column=0, padx=5, pady=5)
     #Deselect All button
-    T.apply(Button(botFrame, text="Deselect All", command=deselectAll).grid(row=0, column=1, padx=5, pady=5))
+    T.apply(Button(botFrame, text="Deselect All", command=deselectAll)).grid(row=0, column=1, padx=5, pady=5)
 
     view.update_idletasks()
     view.minsize(width=max(view.winfo_reqwidth(),300), height=max(view.winfo_reqheight(),200))
@@ -1571,7 +1605,7 @@ def pauseTests():
         stationLabels[-1].grid(column=(testIndexDict[oo.testNum]%10)*2, row=(testIndexDict[oo.testNum]//10)*2, padx=2, pady=3)
         pauseButtons[-1].grid(column=(testIndexDict[oo.testNum]%10)*2, row=(testIndexDict[oo.testNum]//10)*2+1, padx=2, pady=3)
 
-    #wrapper functions which refresh teh dialog after their message has been sent
+    #wrapper functions which refresh the dialog after their message has been sent
     def sendPause(slID):
         pause(slID)
         refresh()
@@ -1645,6 +1679,8 @@ def pauseTests():
 #theme():  This function opens a window that will allow the user to select which colors, font, and text size the program uses
 #As new selections are made, this window will be updated to give the user a preview of the theme they have selected
 #TODO: fix select label appearance
+#TODO: ensure all buttons have the theme applied correctly
+#TODO: examine how entries appear when disabled
 def theme():
     global T
     #initialize a new ThemeAndFont() object based on the current global Theme
@@ -1728,11 +1764,11 @@ def theme():
         tl.destroy()
 
     #save button
-    saveButton = Button(botFrame, text="Save", command=save)
+    saveButton = newTheme(Button(botFrame, text="Save", command=save))
     saveButton.grid(row=0, column=0, padx=5, pady=5)
 
     #cancel button
-    cancelButton = Button(botFrame, text="Cancel", command=tl.destroy)
+    cancelButton = newTheme(Button(botFrame, text="Cancel", command=tl.destroy))
     cancelButton.grid(row=0, column=3, padx=5, pady=5)
 
     #set min window size
@@ -1986,7 +2022,46 @@ def update():
 #draw screen for the first time
 update()
 
+#API hosting block
 
+@api.route('/')
+def manifest():
+    return flask.json.jsonify({'app': 'Power Tools Test Manager', 'version': version})
+
+@api.route('/index')
+def index():
+    return flask.json.jsonify([{
+        "url": oo.url,
+        "number": oo.testNum,
+        "title": oo.name,
+        "subtitle": oo.serial
+        } for oo in tests])
+
+@api.route('/station/<url>')
+def serveStation(url):
+    stationToServe = next([oo for oo in tests if oo.url == url], None)
+    if not stationToServe is None:
+        return flask.json.jsonify({
+            "url": stationToServe.url,
+            "number": stationToServe.testNum,
+            "title": stationToServe.name,
+            "subtitle": stationToServe.serial,
+            "status": stationToServe.status, 
+            "data": [{
+                "name": oo[0],
+                "units": oo[1],
+                "float": oo[2],
+                "show": oo[3]
+                }for oo in stationToServe.data],
+            "controls": [{
+                "name": oo[0],
+                "data": oo[1]
+                }for oo in stationToServe.controls]
+            })
+    return
+#TODO: find a way to host the api without interrupting the rest of the program
+
+#PLC station polling function block
 
 #when given a binary message as a list of ints, returns a 16 bit MODBUS CRC as a list of ints
 def getCRC(msg):
@@ -2253,7 +2328,6 @@ while(running): #root.state() == 'normal'):
         if currTestPoll >= len(tests): #reset poll index to zero
             currTestPoll = 0
     root.update() #maintain root window
-    
 root.destroy()
 if ser.is_open:
     ser.close()

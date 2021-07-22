@@ -128,7 +128,10 @@ class Theme:
         elif isinstance(widget, tk.Button) or isinstance(widget, tk.Menubutton):
             widget.config(bg=self.bg, fg=self.fg, activebackground=self.bg, activeforeground=self.fg)
 
-        elif isinstance(widget, tk.Entry) or isinstance(widget, tk.Text):
+        elif isinstance(widget, tk.Entry):
+            widget.config(bg=self.theme.contrast_bg, fg=self.theme.contrast_fg, selectbackground=self.theme.contrast_selectbg, selectforeground=self.theme.contrast_selectfg, disabledbackground=self.theme.bg, disabledforeground=self.theme.fg)
+
+        elif isinstance(widget, tk.Text):
             widget.config(bg=self.contrast_bg, fg=self.contrast_fg, selectbackground=self.contrast_selectbg, selectforeground=self.contrast_selectfg)
        
         elif isinstance(widget, tk.Checkbutton) or isinstance(widget, Radiobutton):
@@ -208,9 +211,12 @@ class ThemeAndFont:
         elif isinstance(widget, tk.Button) or isinstance(widget, tk.Menubutton):
             widget.config(bg=self.theme.bg, fg=self.theme.fg, activebackground=self.theme.bg, activeforeground=self.theme.fg, font=(self.family, self.size))
 
-        elif isinstance(widget, tk.Entry) or isinstance(widget, tk.Text):
-            widget.config(bg=self.theme.contrast_bg, fg=self.theme.contrast_fg, selectbackground=self.theme.contrast_selectbg, selectforeground=self.theme.contrast_selectfg, font=(self.family, self.size))
+        elif isinstance(widget, tk.Entry):
+            widget.config(bg=self.theme.contrast_bg, fg=self.theme.contrast_fg, selectbackground=self.theme.contrast_selectbg, selectforeground=self.theme.contrast_selectfg, disabledbackground=self.theme.bg, disabledforeground=self.theme.fg, font=(self.family, self.size))
         
+        elif isinstance(widget, tk.Text):
+            widget.config(bg=self.theme.contrast_bg, fg=self.theme.contrast_fg, selectbackground=self.theme.contrast_selectbg, selectforeground=self.theme.contrast_selectfg, font=(self.family, self.size))
+
         elif isinstance(widget, tk.Checkbutton) or isinstance(widget, tk.Radiobutton):
             widget.config(bg=self.theme.bg, fg='black', activebackground=self.theme.bg, activeforeground=self.theme.bg, font=(self.family, self.size))
 
@@ -229,7 +235,9 @@ if __name__ == "__main__":
     T = ThemeAndFont(theme=Th, family = 'Comic Sans MS', size = 19)
     root = T(tk.Tk())
     T(tk.Label(root, text="Hello")).pack()
-    T(tk.Button(root, text="Hi")).pack()
+    e = T(tk.Entry(root))
+    e.pack()
+    T(tk.Button(root, text="disable", command = lambda: e.config(state=tk.DISABLED))).pack()
     T(tk.Text(root)).pack()
     T(tk.Checkbutton(root)).pack()
 

@@ -523,24 +523,28 @@ def parseJSONsession(s):
 
     return newTests
         
-def connect(): #TODO: test this more thoroughly 
+def connect(): #TODO: test com connection more thoroughly ?
     global ser
     #setup the new menu
-    connector = T.apply(Toplevel())
-    connector.title('Connect')
-    connector.grab_set() #make window modal
-    connector.focus_set()
+    tl = T.apply(Toplevel())
+    tl.title('Connect')
+    tl.grab_set() #make window modal
+    tl.focus_set()
 
     currentPortSelection = 0
+
+    COMframe = T(LabelFrame(tl, text="COM Ports", padx=5, pady=5, relief=RIDGE))
+
+    APIframe = T(LabelFrame(tl, text="COM Ports", padx=5, pady=5, relief=RIDGE))
 
     #Add ports to dropdown menu, refresh interactable widgets
     def getCOMs():
         if ser.is_open:
-            portHint.config(text="Connected to %s" % ser.port)
-            disconnectButton.config(state=NORMAL)
+            COMportHint.config(text="Connected to %s" % ser.port)
+            disconnectCOMButton.config(state=NORMAL)
         else:
-            portHint.config(text="Not Connected")
-            disconnectButton.config(state=DISABLED)
+            COMportHint.config(text="Not Connected")
+            disconnectCOMButton.config(state=DISABLED)
 
         select(0)  #reset dropdown menu
         dropdown.menu.delete(0, END)
@@ -558,13 +562,13 @@ def connect(): #TODO: test this more thoroughly
         currentPortSelection = portSelection
         if currentPortSelection > 0 and currentPortSelection <= 256:
             dropdown.config(text='COM%s' % (currentPortSelection)+" \U000025BC")
-            connectButton.config(state=NORMAL)                       
+            connectCOMButton.config(state=NORMAL)                       
         else:
             dropdown.config(text="Select a COM port \U000025BC")
-            connectButton.config(state=DISABLED)
+            connectCOMButton.config(state=DISABLED)
 
     #connects the program to the chosen COM port
-    def connect():
+    def connectCOM():
         global ser
         global serTimeout
         try:
@@ -576,43 +580,78 @@ def connect(): #TODO: test this more thoroughly
             messagebox.showerror("Power Tools Test Manager", "Could not connect to COM port", parent=root.focus_get())
         else:
             update()
-            connector.destroy()
+            getCOMs()
 
-    def disconnect():
+    def disconnectCOM():
         global ser
         if ser.is_open:
             ser.close()
         update()
-        connector.destroy()
+        getCOMs()
+
+    def connectAPI(): #TODO: implement this
+        APIhint.config(text="Now serving on 0.0.0.0:%s" % APIportEntry.get())
+        connectAPIButton.config(state=DISABLED)
+        disconnectAPIButton.config(state=NORMAL)
+
+    def disconnectAPI():
+        APIhint.config(text="Not Serving")
+        connectAPIButton.config(state=NORMAL)
+        disconnectAPIButton.config(state=DISABLED)
+
+    #Create interactable elements for COM port setup
 
     #draw port chooser dropdown
-    dropdown = T.apply(Menubutton(connector, width=17, relief=RAISED))
+    dropdown = T.apply(Menubutton(COMframe, width=17, relief=RAISED))
     dropdown.menu = T.apply(Menu(dropdown, tearoff=0))
     dropdown["menu"] = dropdown.menu
     dropdown.grid(row=0, column=0, padx=5, pady=5)
 
-    portHint = T.apply(Label(connector, width=17))
-    portHint.grid(row=1, column=0, padx=5, pady=5)
+    #hint showing the status of the COM port connection
+    COMportHint = T.apply(Label(COMframe, width=17))
+    COMportHint.grid(row=1, column=0, padx=5, pady=5)
 
     #refresh button
-    T.apply(Button(connector, text='Rescan COM Ports', command=getCOMs)).grid(row=0, column=2, padx=5, pady=5)
+    T.apply(Button(COMframe, text='Rescan COM Ports', command=getCOMs)).grid(row=0, column=2, padx=5, pady=5)
 
     #connect Button
-    connectButton = T.apply(Button(connector, text='Connect', command=connect))
-    connectButton.grid(row=0, column=1, padx=5, pady=5)
+    connectCOMButton = T.apply(Button(COMframe, text='Connect', command=connectCOM))
+    connectCOMButton.grid(row=0, column=1, padx=5, pady=5)
 
     #disconnect Button
-    disconnectButton = T.apply(Button(connector, text='Disconnect', command=disconnect))
-    disconnectButton.grid(row=1, column=1, padx=5, pady=5)
+    disconnectCOMButton = T.apply(Button(COMframe, text='Disconnect', command=disconnectCOM))
+    disconnectCOMButton.grid(row=1, column=1, padx=5, pady=5)
 
-    #close button
-    T.apply(Button(connector, text='Cancel', command=connector.destroy)).grid(row=1, column=2, padx=5, pady=5)
+    COMframe.pack(side=TOP, padx=5, pady=5)
 
     getCOMs() #scan ports to populate list for the first time
 
+    #Create interactable elements for API server setup
+
+    #Entry for inputing the desired net port
+    APIportEntry = T(Entry(APIframe, width=25))
+    APIportEntry.grid(row=0, column=0, padx=5, pady=5)
+
+    #hint showing the status of the API connection
+    APIhint = T(Label(APIframe, width=25))
+    APIhint.grid(row=1, column=0, padx=5, pady=5)
+
+    #connect button
+    connectAPIButton = T(Button(APIframe, text='Connect', command=connectAPI))
+    connectAPIButton.grid(row=0, column=1, padx=5, pady=5)
+
+    #disconnect button
+    disconnectAPIButton = T(Button(APIframe, text='Disconnect', command = disconnectAPI))
+    disconnectAPIButton.grid(row=1, column=1, padx=5, pady=5)
+
+    APIframe.pack(side=TOP, padx=5, pady=5)
+
+    #close button
+    T.apply(Button(tl, text='Close', command=tl.destroy)).pack(side=BOTTOM, padx=5, pady=5)
+
     #set min window size
-    connector.update_idletasks()
-    connector.minsize(width=max(connector.winfo_reqwidth(),0), height=max(connector.winfo_reqheight(),0))
+    tl.update_idletasks()
+    tl.minsize(width=max(tl.winfo_reqwidth(),0), height=max(tl.winfo_reqheight(),0))
 
 #editTests, creates a new dialog for editting the information of each test
 def editTests(initialTestNum=0):
@@ -1680,7 +1719,6 @@ def pauseTests():
 #As new selections are made, this window will be updated to give the user a preview of the theme they have selected
 #TODO: fix select label appearance
 #TODO: ensure all buttons have the theme applied correctly
-#TODO: examine how entries appear when disabled
 def theme():
     global T
     #initialize a new ThemeAndFont() object based on the current global Theme
@@ -1801,7 +1839,7 @@ menubar = Menu(root)
 fileMenu = Menu(menubar, tearoff=0)
 fileMenu.add_command(label="Save Session", command=saveSession)
 fileMenu.add_command(label="Open Session", command=openSession)
-fileMenu.add_command(label="Connect to Port", command=connect)
+fileMenu.add_command(label="Connections", command=connect)
 fileMenu.add_command(label="Write to File", command=writeToFile)
 fileMenu.add_command(label="Exit", command=exitProgram)
 menubar.add_cascade(label="File", menu=fileMenu)
@@ -1960,7 +1998,7 @@ def update():
     if not locked:
         fileMenu.entryconfig(0, label="Save Session", command=saveSession, state=NORMAL)
         fileMenu.entryconfig(1, label="Open Session", command=openSession, state=NORMAL)
-        fileMenu.entryconfig(2, label="Connect to Port", command=connect, state=NORMAL)
+        fileMenu.entryconfig(2, label="Connections", command=connect, state=NORMAL)
         fileMenu.entryconfig(3, label="Write to File", command=writeToFile, state=NORMAL)
         fileMenu.entryconfig(4, label="Exit", command=exitProgram, state=NORMAL)
         
@@ -1983,7 +2021,7 @@ def update():
     else:
         fileMenu.entryconfig(0, label="Save Session", command=saveSession)
         fileMenu.entryconfig(1, label="Open Session", state=DISABLED)
-        fileMenu.entryconfig(2, label="Connect to Port", state=DISABLED)
+        fileMenu.entryconfig(2, label="Connections", state=DISABLED)
         fileMenu.entryconfig(3, label="Write to File", command=writeToFile)
         fileMenu.entryconfig(4, label="Exit", command=exitProgram)
         

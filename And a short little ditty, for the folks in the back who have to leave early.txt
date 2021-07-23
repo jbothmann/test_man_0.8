@@ -1,0 +1,29 @@
+Notes for hosting a server, 7/23/2021
+Some sort of multitasking is required to run a server concurrently with a tkinter instance and all of the serial polling.
+I need the option to kill tasks.  This may take the form of including an exit condition, or by killing a tast forcefully.
+
+Multithreading vs. Multiprocessing:
+Killing a thread is messy and unsupported, while killing a process is at least supported
+Sharing resources between threads is easy, while sharing resources between processes is hard and expensive
+
+Exit conditions:
+Tkinter:
+	root.destroy().   They make it very easy.
+Serial:
+	It's MY loop and I choose the exit condition!  Very easy.
+Requests:
+	It's MY loop and I choose the exit condition!  Very easy.
+Flask:
+	environ['werkzeug.server.shutdown']().  Barely supported, extremely contentious with the werkzeug nerds.  Also, only works with the app.run() basic server.
+	References:
+		https://github.com/pallets/werkzeug/issues/1752
+		http://web.archive.org/web/20190706125149/http://flask.pocoo.org/snippets/67
+		https://werkzeug.palletsprojects.com/en/2.0.x/serving/
+Production Server:
+	I haven't found a production server that can be run and terminated from a python script
+
+Threading:
+Essentially, it's gonna look like this.  Three threads will be created.  All threads will be non-daemonic, and must be joined upon creation.  
+Tkinter only exits upon application closing.
+Serial communication terminates upon closing the port connection, or upon application closing
+API serving terminates upon closing the server, or upon application closing

@@ -57,7 +57,7 @@ families = []
 #create an empty list, to be filled with user-specified text sizes from the fonts.json config file.  Population occurs in startup configuration phase
 sizes = []
 
-#create a ThemeAndFont object, which we will use to paint our program
+#create a ThemeAndFont object, which we will use to paint our program #TODO: ThemeAndFont should be subclassed to override apply() to work with SelectLabels
 T = tkTheme.ThemeAndFont()
 
 #class Test, holds all information about one test
@@ -130,8 +130,10 @@ class Test:
         self.c = c
 
         #apply theme to all widgets
-        T.apply([self.labelWidgetFrame, self.stationNumLabel, self.connectionHint, self.frame, self.dataLabel, self.statusIndicator, self.button2])
+        T.apply([self.labelWidgetFrame, self.stationNumLabel, self.connectionHint, self.frame, self.statusIndicator, self.button2])
 
+        #apply non-contrast theme to SelectLabel() widget dataLabel
+        self.dataLabel.config(bg=T.theme.bg, fg=T.theme.fg, selectbackground=T.theme.selectbg, selectforeground=T.theme.selectfg, font=(T.family, T.size))
         self.stationNumLabel.config(text="Station " + str(self.testNum), font=(T.family, T.size+2))
         self.connectionHint.config(fg = 'red')
         self.frame.grid(row=r, column=c, pady=3, padx=3) #regrid the frame

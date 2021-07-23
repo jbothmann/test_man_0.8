@@ -126,7 +126,7 @@ class Theme:
             widget.config(bg=self.bg, fg=self.fg)
 
         elif isinstance(widget, tk.Button) or isinstance(widget, tk.Menubutton):
-            widget.config(bg=self.bg, fg=self.fg, activebackground=self.bg, activeforeground=self.fg)
+            widget.config(bg=self.theme.contrast_bg, fg=self.theme.contrast_fg, activebackground=self.theme.contrast_selectbg, activeforeground=self.theme.contrast_selectfg)
 
         elif isinstance(widget, tk.Entry):
             widget.config(bg=self.theme.contrast_bg, fg=self.theme.contrast_fg, selectbackground=self.theme.contrast_selectbg, selectforeground=self.theme.contrast_selectfg, disabledbackground=self.theme.bg, disabledforeground=self.theme.fg)
@@ -209,7 +209,7 @@ class ThemeAndFont:
             widget.config(bg=self.theme.bg, fg=self.theme.fg, font=(self.family, self.size))
 
         elif isinstance(widget, tk.Button) or isinstance(widget, tk.Menubutton):
-            widget.config(bg=self.theme.bg, fg=self.theme.fg, activebackground=self.theme.bg, activeforeground=self.theme.fg, font=(self.family, self.size))
+            widget.config(bg=self.theme.contrast_bg, fg=self.theme.contrast_fg, activebackground=self.theme.contrast_selectbg, activeforeground=self.theme.contrast_selectfg, font=(self.family, self.size))
 
         elif isinstance(widget, tk.Entry):
             widget.config(bg=self.theme.contrast_bg, fg=self.theme.contrast_fg, selectbackground=self.theme.contrast_selectbg, selectforeground=self.theme.contrast_selectfg, disabledbackground=self.theme.bg, disabledforeground=self.theme.fg, font=(self.family, self.size))
@@ -231,14 +231,36 @@ class ThemeAndFont:
 #Testing stuff
 if __name__ == "__main__":
     print(all(Theme.isColor(oo) for oo in Theme.x11colors))
-    Th = Theme(bg='red', fg = 'purple4', contrast_bg = 'PaleVioletRed2', contrast_fg = 'LimeGreen', contrast_selectbg='MediumSpringGreen', contrast_selectfg='purple')
-    T = ThemeAndFont(theme=Th, family = 'Comic Sans MS', size = 19)
+    Th = [
+        Theme(bg='red', fg = 'purple4', contrast_bg = 'PaleVioletRed2', contrast_fg = 'LimeGreen', contrast_selectbg='MediumSpringGreen', contrast_selectfg='purple'),
+        Theme(),
+        Theme( **{"title": "Night",
+            "bg": "#1d2951",
+            "fg": "white",
+            "selectbg": "white",
+            "selectfg": "slate gray",
+            "contrast_bg": "slate gray",
+            "contrast_fg": "white",
+            "contrast_selectbg": "white",
+            "contrast_selectfg": "slate gray"})
+        ]
+    T = ThemeAndFont(theme=Th[1], family = 'Comic Sans MS', size = 19)
     root = T(tk.Tk())
     T(tk.Label(root, text="Hello")).pack()
     e = T(tk.Entry(root))
     e.pack()
-    T(tk.Button(root, text="disable", command = lambda: e.config(state=tk.DISABLED))).pack()
+    b = []
+    for ii in range(5):
+        b.append(T(tk.Button(root, text="disable", command = lambda: next(oo for oo in b if oo.cget('state') != tk.DISABLED).config(state=tk.DISABLED))))
+        b[-1].pack()
+    dropdown = T.apply(tk.Menubutton(root, text="dropdown", width=17, relief=tk.RAISED))
+    dropdown.menu = T.apply(tk.Menu(dropdown, tearoff=0))
+    dropdown["menu"] = dropdown.menu
+    for ii in range(5):
+        dropdown.menu.add_command(label=str(ii))
+    dropdown.pack()
     T(tk.Text(root)).pack()
     T(tk.Checkbutton(root)).pack()
+
 
     root.mainloop()

@@ -199,7 +199,7 @@ class Test:
         #initialize frame, which will be used to store the widgets
         self.frame = LabelFrame(dataFrame, labelwidget=self.labelWidgetFrame, padx=5, pady=5, relief=RIDGE)
 
-        #initialize dataLabel, which will be used to display info
+        #initialize dataLabel, which will be used to display info #TODO: fix selections not working properly when the contents are being modified
         self.dataLabel = SelectLabel(self.frame)
         #initialize statusIndicator, which will be used to visually represent the status of the test
         self.statusIndicator = Label(self.frame)
@@ -226,8 +226,10 @@ class Test:
         self.c = c
 
         #apply theme to all widgets
-        T.apply([self.labelWidgetFrame, self.stationNumLabel, self.button0, self.frame, self.dataLabel, self.statusIndicator, self.button1, self.button2])
+        T.apply([self.labelWidgetFrame, self.stationNumLabel, self.button0, self.frame, self.statusIndicator, self.button1, self.button2])
 
+        #apply non-contrast theme to SelectLabel() widget dataLabel
+        self.dataLabel.config(bg=T.theme.bg, fg=T.theme.fg, selectbackground=T.theme.selectbg, selectforeground=T.theme.selectfg, font=(T.family, T.size))
         self.stationNumLabel.config(text="Station " + str(self.testNum), font=(T.family, T.size+2))
         self.frame.grid(row=r, column=c, pady=3, padx=3) #regrid the frame
 
@@ -990,7 +992,7 @@ def deleteTest():
     #draw the set of checkboxes to the screen
     for i in range(len(tests)):
         option = "Station "+str(tests[i].testNum)+": "+tests[i].name
-        l.append(T.apply(SelectLabel(optionsFrame, text=option)))
+        l.append(SelectLabel(optionsFrame, text=option, bg=T.theme.bg, fg=T.theme.fg, selectbackground=T.theme.selectbg, selectforeground=T.theme.selectfg, font=(T.family, T.size)))
         r.append(IntVar())
         r[i].set(0)
         c.append(T.apply(Checkbutton(optionsFrame, text=None, variable=r[i], onvalue=1, offvalue=0, padx=10)))
@@ -1060,7 +1062,7 @@ def changeView():
     #draw the set of checkboxes to the screen
     for i in range(len(tests)):
         option = "Test "+str(tests[i].testNum)+": "+tests[i].name
-        l.append(T.apply(SelectLabel(topFrame, text=option)))
+        l.append(SelectLabel(topFrame, text=option, bg=T.theme.bg, fg=T.theme.fg, selectbackground=T.theme.selectbg, selectforeground=T.theme.selectfg, font=(T.family, T.size)))
         r.append(IntVar())
         r[i].set(tests[i].showTest)
         c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[i], onvalue=1, offvalue=0, padx=10)))
@@ -1127,7 +1129,7 @@ def writeToFile():
     #draw the set of checkboxes to the screen
     for i in range(len(tests)):
         option = "Station "+str(tests[i].testNum)+": "+tests[i].name
-        l.append(T.apply(SelectLabel(topFrame, text=option)))
+        l.append(SelectLabel(topFrame, text=option, bg=T.theme.bg, fg=T.theme.fg, selectbackground=T.theme.selectbg, selectforeground=T.theme.selectfg, font=(T.family, T.size)))
         r.append(IntVar())
         r[i].set(tests[i].showTest)
         c.append(T.apply(Checkbutton(topFrame, text=None, variable=r[i], onvalue=1, offvalue=0, padx=10)))
@@ -1638,7 +1640,7 @@ def pauseTests():
     stationLabels = []
     pauseButtons = []
     for oo in tests:
-        stationLabels.append(T.apply(SelectLabel(midFrame, text="Station "+str(oo.testNum)+": "+oo.name)))
+        stationLabels.append(SelectLabel(midFrame, text="Station "+str(oo.testNum)+": "+oo.name, bg=T.theme.bg, fg=T.theme.fg, selectbackground=T.theme.selectbg, selectforeground=T.theme.selectfg, font=(T.family, T.size)))
         pauseButtons.append(T.apply(Button(midFrame, width=10)))
 
         stationLabels[-1].grid(column=(testIndexDict[oo.testNum]%10)*2, row=(testIndexDict[oo.testNum]//10)*2, padx=2, pady=3)
@@ -1717,8 +1719,6 @@ def pauseTests():
 
 #theme():  This function opens a window that will allow the user to select which colors, font, and text size the program uses
 #As new selections are made, this window will be updated to give the user a preview of the theme they have selected
-#TODO: fix select label appearance
-#TODO: ensure all buttons have the theme applied correctly
 def theme():
     global T
     #initialize a new ThemeAndFont() object based on the current global Theme
@@ -1739,61 +1739,56 @@ def theme():
     botFrame = newTheme.apply(Frame(tl, bd=0))
     botFrame.pack(side=BOTTOM)
 
-    terse = newTheme.apply(SelectLabel(topFrame, text="Current Theme: %s, %i %s" % (newTheme.theme.title, newTheme.size, newTheme.family)))
+    terse = SelectLabel(topFrame, text="Current Theme: %s, %i %s" % (newTheme.theme.title, newTheme.size, newTheme.family), bg=newTheme.theme.bg, fg=newTheme.theme.fg, selectbackground=newTheme.theme.selectbg, selectforeground=newTheme.theme.selectfg, font=(newTheme.family, newTheme.size))
     terse.pack()
 
     def refresh():
         newTheme.set(theme=next((oo for oo in themes if oo.title == colorsVar.get()), tkTheme.Theme()), family=fontVar.get(), size=fontSizeVar.get())
 
-        newTheme.apply(tl)
-        newTheme.apply(topFrame)
-        newTheme.apply(midFrame)
-        newTheme.apply(botFrame)
-        newTheme.apply(terse) #fix
-        terse.config(text="Current Theme: %s, %i %s" % (newTheme.theme.title, newTheme.size, newTheme.family))
-        newTheme.apply([colorsHeader, fontSizeHeader, fontHeader, saveButton, cancelButton])
-        for oo in r:
-            newTheme.apply(oo)
+        newTheme.apply([tl, topFrame, midFrame, botFrame])
+        terse.config(text="Current Theme: %s, %i %s" % (newTheme.theme.title, newTheme.size, newTheme.family), bg=newTheme.theme.bg, fg=newTheme.theme.fg, selectbackground=newTheme.theme.selectbg, selectforeground=newTheme.theme.selectfg, font=(newTheme.family, newTheme.size))
+        newTheme.apply([saveButton, cancelButton, r])
+        for oo in [colorsHeader, fontSizeHeader, fontHeader]:
+            oo.config(bg=newTheme.theme.bg, fg=newTheme.theme.fg, selectbackground=newTheme.theme.selectbg, selectforeground=newTheme.theme.selectfg, font=(newTheme.family, newTheme.size))
         for oo in l:
-            newTheme.apply(oo)
+            oo.config(bg=newTheme.theme.bg, fg=newTheme.theme.fg, selectbackground=newTheme.theme.selectbg, selectforeground=newTheme.theme.selectfg, font=(newTheme.family, newTheme.size))
 
     r = [] #list of all radiobuttons
     l = [] #list of all accompanying labels
 
     colorsVar = StringVar(value=newTheme.theme.title)
     colorsOptions = [oo.title for oo in themes]
-    colorsHeader = newTheme.apply(SelectLabel(midFrame, text="Color Theme:"))
+    colorsHeader = SelectLabel(midFrame, text="Color Theme:")
     colorsHeader.grid(row=0, column=1, columnspan=1)
 
     for ii in range(len(colorsOptions)):
-        r.append(newTheme.apply(Radiobutton(midFrame, variable=colorsVar, value=colorsOptions[ii], command=refresh)))
-        l.append(newTheme.apply(SelectLabel(midFrame, text=colorsOptions[ii])))
+        r.append(Radiobutton(midFrame, variable=colorsVar, value=colorsOptions[ii], command=refresh))
+        l.append(SelectLabel(midFrame, text=colorsOptions[ii]))
 
         r[-1].grid(row=ii+1, column=0)
         l[-1].grid(row=ii+1, column=1)
 
     fontSizeVar = IntVar(value=newTheme.size)
-    fontSizeHeader = newTheme.apply(SelectLabel(midFrame, text="Text Size:"))
+    fontSizeHeader = SelectLabel(midFrame, text="Text Size:")
     fontSizeHeader.grid(row=0, column=5, columnspan=1)
 
     for ii in range(len(sizes)):
-        r.append(newTheme.apply(Radiobutton(midFrame, variable=fontSizeVar, value=sizes[ii], command=refresh)))
-        l.append(newTheme.apply(SelectLabel(midFrame, text=str(sizes[ii]))))
+        r.append(Radiobutton(midFrame, variable=fontSizeVar, value=sizes[ii], command=refresh))
+        l.append(SelectLabel(midFrame, text=str(sizes[ii])))
 
         r[-1].grid(row=ii+1, column=4)
         l[-1].grid(row=ii+1, column=5)
 
     fontVar = StringVar(value=newTheme.family)
-    fontHeader = newTheme.apply(SelectLabel(midFrame, text="Font Family:"))
+    fontHeader = SelectLabel(midFrame, text="Font Family:")
     fontHeader.grid(row=0, column=3, columnspan=1)
 
     for ii in range(len(families)):
-        r.append(newTheme.apply(Radiobutton(midFrame, variable=fontVar, value=families[ii], command=refresh)))
-        l.append(newTheme.apply(SelectLabel(midFrame, text=families[ii])))
+        r.append(Radiobutton(midFrame, variable=fontVar, value=families[ii], command=refresh))
+        l.append(SelectLabel(midFrame, text=families[ii]))
 
         r[-1].grid(row=ii+1, column=2)
         l[-1].grid(row=ii+1, column=3)
-
 
     def save():
         global T
@@ -1808,6 +1803,9 @@ def theme():
     #cancel button
     cancelButton = newTheme(Button(botFrame, text="Cancel", command=tl.destroy))
     cancelButton.grid(row=0, column=3, padx=5, pady=5)
+
+    #update the menu for the first time
+    refresh()
 
     #set min window size
     tl.update_idletasks()

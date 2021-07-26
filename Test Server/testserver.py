@@ -2,8 +2,8 @@ import os
 
 from flask import Flask, json, request
 
-#DIR =  "D:/Documents/GitHub/test_man_0.8/Test Server/dummy JSON/"
-DIR = "C:/Users/np0083/Documents/GitHub/test_man_0.8/Test Server/dummy JSON/"
+DIR =  "D:/Documents/GitHub/test_man_0.8/Test Server/dummy JSON/"
+#DIR = "C:/Users/np0083/Documents/GitHub/test_man_0.8/Test Server/dummy JSON/"
 
 def shutdown_server():
     func = request.environ.get('werkzeug.server.shutdown')

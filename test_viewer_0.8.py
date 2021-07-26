@@ -13,6 +13,7 @@ import string
 import random
 import tkTheme #Local Import
 import tkinter.font
+import threading
 
 version = "0.8"
 
@@ -34,14 +35,13 @@ favicon = PhotoImage(data=encoded_string)
 root.iconphoto(True, favicon) #sets the favicon for root and all toplevel()
 root.title('Power Tools Test Viewer')
 
-running = True
-
 #procedure to be taken when attempting to exit the program, which will prompt a save
 def exitProgram():
     global running
     response = messagebox.askyesno("Power Tools Test Viewer", "Exit Test Viewer?", parent=root.focus_get())
     if response:
-        running = False
+        poll.stop()
+        root.destroy()
 
 root.protocol('WM_DELETE_WINDOW', exitProgram) #Override close button with exitProgram
 
@@ -57,8 +57,24 @@ families = []
 #create an empty list, to be filled with user-specified text sizes from the fonts.json config file.  Population occurs in startup configuration phase
 sizes = []
 
+#ThemeAndFont subclass that provides support for SelectLabels
+class myThemeAndFont(tkTheme.ThemeAndFont):
+    def apply(self, widget):
+        if isinstance(widget, list):
+            for oo in widget:
+                self.apply(oo)
+        elif isinstance(widget, SelectLabel):
+            widget.config(bg=T.theme.bg, fg=T.theme.fg, selectbackground=T.theme.selectbg, selectforeground=T.theme.selectfg, font=(T.family, T.size))
+        else:
+            super().apply(widget)
+
+        return widget
+
+    __call__ = apply
+
+
 #create a ThemeAndFont object, which we will use to paint our program #TODO: ThemeAndFont should be subclassed to override apply() to work with SelectLabels
-T = tkTheme.ThemeAndFont()
+T = myThemeAndFont()
 
 #class Test, holds all information about one test
 class Test:
@@ -119,6 +135,8 @@ class Test:
         self.statusIndicator.grid(row=2, pady=2)
         #draw control button
         self.button2.grid(row=5)
+
+        self.periodicCall() #Do first call and update to 
     
        
     #Test.draw, draws the information to the screen based on internal info
@@ -148,7 +166,10 @@ class Test:
     #updateLabel, reconfigures the widgets within the gui frame to accurately represent and control the incoming data
     def updateLabel(self):
         global root
+        #Update data label to reflect current data
         self.dataLabel.config(text=self.toString())
+
+        #Update status label to reflect current status, and update buttons to 
         if self.status == Test.NORMAL:
             self.statusIndicator.config(text="\U00002B24   In Progress", fg="green")
             self.button2.config(text="Show Controls", command=lambda: openControls(self.testNum), state=NORMAL)
@@ -165,9 +186,20 @@ class Test:
             self.statusIndicator.config(text=None)
             self.button2.config(text="Show Controls", state=DISABLED)
 
+        #update connectionHint to reflect connection status
+        if self.online:
+            self.connectionHint.config(text="")
+        else:
+            self.connectionHint.config(text="No Connection")
+
         #reconfigure the minimum size of the main window
         root.update_idletasks()
         root.minsize(width=max(root.winfo_reqwidth(),400), height=max(root.winfo_reqheight(),300))
+
+    def periodicCall(self):
+        if self.showTest == True:
+            self.updateLabel()
+        root.after(200, self.periodicCall) #schedule next call, in ms
 
     def setData(self, newData):
         #handle given data, making sure that each entry is a proper 4-list  
@@ -213,8 +245,6 @@ class Test:
                 self.data[ii][0] = oo #set datum name if only a string name is given
                 self.data[ii][3] = True #assume the data is used if it has a name
 
-        self.updateLabel()
-
     def setControls(self, newControls):
         self.controls = []
         for oo in newControls:
@@ -237,19 +267,16 @@ class Test:
                     if isinstance(oo["bool"], bool):
                         self.controls[-1][1] = oo["bool"] #set control status, boolean
 
-
                 elif isinstance(controls[-1], str):
                     self.controls[-1][0] = oo #set control label if only a string name is given 
 
     def setOnline(self):
         if not self.online:
             self.online = True
-            self.connectionHint.config(text="")
 
     def setOffline(self):
         if self.online:
             self.online = False
-            self.connectionHint.config(text="No Connection")
 
 
     #Test.toString, will return a text representation of the data in the Test object
@@ -265,7 +292,7 @@ tests = []
 #Dictionary which will be used to link address to index in tests[]
 testIndexDict = {}
 
-#connect(), opens a dialog which allows the user to enter the url that they want to connect to 
+#connect(), opens a dialog which allows the user to enter the url that they want to connect to
 def connect():
     global main_url
     #setup the new menu
@@ -325,7 +352,7 @@ def connect():
 
     #set min window size
     connector.update_idletasks()
-    connector.minsize(width=max(connector.winfo_reqwidth(),0), height=max(connector.winfo_reqheight(),0))
+    connector.minsize(width=max(connector.winfo_reqwidth(),225), height=max(connector.winfo_reqheight(),40))
 
 #changeView, opens a dialog which allows the user to choose which tests are drawn on the screen 
 def changeView():
@@ -609,7 +636,6 @@ def openControls(InitialTestNum=0):
 
 #theme():  This function opens a window that will allow the user to select which colors, font, and text size the program uses
 #As new selections are made, this window will be updated to give the user a preview of the theme they have selected
-#TODO: fix select label appearance
 def theme():
     global T
     #initialize a new ThemeAndFont() object based on the current global Theme
@@ -737,85 +763,6 @@ menubar.add_cascade(label="View", menu=viewMenu)
 
 root.config(menu=menubar)
 
-#startup configuration block
-
-#add all themes from themes configuration file
-try:
-    themefile = json.load(open("themes.json"))
-    #expects a list of JSON objects with attributes that can be used to initialize Theme objects
-    for kwargs in themefile:
-        themes.append(tkTheme.Theme(**kwargs))
-
-except Exception as e:
-    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from themes file", parent=root.focus_get())
-finally:
-    if len(themes) == 0:
-        themes.append(T.theme) #default theme
-
-#add all font options from font configuration file
-try:
-    fontsfile = json.load(open("fonts.json"))
-    #expects a list of font family names
-    if "families" in fontsfile:
-        if isinstance(fontsfile["families"], list):
-            families.extend([oo for oo in fontsfile["families"] if oo in tkinter.font.families()])
-
-    #expects a list of integer sizes
-    if "sizes" in fontsfile:
-        if isinstance(fontsfile["sizes"], list):
-            sizes.extend([oo for oo in fontsfile["sizes"] if isinstance(oo, int)])
-
-except Exception as e:
-    raise
-    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from fonts file", parent=root.focus_get())
-finally:
-    if len(families) == 0:
-        families.append(T.family) #default font family
-    if len(sizes) == 0:
-        sizes.append(T.size) #default font size
-
-#configure on start up from config file
-try:
-    conf = json.load(open("config.json"))
-
-    #sets the main url on startup.  "url" accepts a string value, which becomes the main url
-    if "url" in conf:
-        if isinstance(conf['url'], str):
-            main_url = conf['url']
-
-    #determines whether the program attempts to add all the stations from the server on startup.  "addAll" accepts a boolean value.
-    #If true, the program will attempt to contact the server and add all station
-    if "addAll" in conf:
-        if isinstance(conf['addAll'], bool):
-            if conf['addAll']:
-                try:
-                    get = requests.get(main_url + 'index')
-                    for ii in range(len(get.json())):
-                        tests.append(Test(get.json()[ii]['url'], get.json()[ii]['number'], get.json()[ii]['title'], get.json()[ii]['subtitle']))
-                except Exception as e:
-                    pass
-
-    #sets the display theme on startup.  "theme" accepts a string value.  If the value matches the name of a loaded theme, that theme will be selected, otherwise it will select the first loaded theme
-    if "theme" in conf:
-        if isinstance(conf['theme'], str):
-            T.set(theme=next((oo for oo in themes if oo.title == conf['theme']), themes[0]))
-
-    #sets the font family on startup.  "fontFamily" accepts a string value.  If the value is the name of a tkinter supported font, that font will be selected
-    if "fontFamily" in conf:
-        if conf["fontFamily"] in tkinter.font.families():
-            T.set(family=conf["fontFamily"])
-
-    #sets the font size on startup.  "fontSize" accepts an integer value to use as the size of the font
-    if "fontSize" in conf:
-        if isinstance(conf["fontSize"], int):
-            T.set(size=conf["fontSize"])
-
-except Exception as e:
-    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
-
-
-
-
 #Draws the screen with the current parameters
 def update():
     global root
@@ -844,36 +791,126 @@ def update():
     root.geometry(str(max(root.winfo_reqwidth(),400))+'x'+str(max(root.winfo_reqheight(),300)))
     root.minsize(width=max(root.winfo_reqwidth(),400), height=max(root.winfo_reqheight(),300))
 
-           
-#draw screen for the first time
-update()
-
-currTestPoll = 0    
-
-#main loop for recieving checking up and recieving from PLCs and continuing the GUI
-#if the loop encounters an error while parsing three times in a row, it will mark the test as offline and proceed to poll the next test
-while(running): #root.state() == 'normal'):
-    if currTestPoll < len(tests):
-        try:
-            get = requests.get(main_url+"station/"+tests[currTestPoll].url)
-            tests[currTestPoll].testNum = get.json()['number']
-            tests[currTestPoll].name = get.json()['title']
-            tests[currTestPoll].serial = get.json()['subtitle']
-            tests[currTestPoll].status = get.json()['status']
-            tests[currTestPoll].setData(get.json()['data'])
-            tests[currTestPoll].setControls(get.json()['controls'])
-            tests[currTestPoll].setOnline()
-
-        except Exception as e:
-            tests[currTestPoll].setOffline()
-        currTestPoll += 1
-    if currTestPoll >= len(tests): #reset poll index to zero
-        currTestPoll = 0
-
-    #sleep(pollPeriod)
-
-    root.update() #maintain root window
     
-root.destroy()
+class Polling:
+    def __init__(self):
+        self.currTestPoll = 0
+        self.running = True
 
-#root.mainloop()
+    #main loop for recieving checking up and recieving from PLCs and continuing the GUI
+    def mainloop(self):
+        #if the loop encounters an error while parsing, it will mark the test as offline and proceed to poll the next test
+        while(self.running): 
+            if self.currTestPoll < len(tests):
+                try:
+                    get = requests.get(main_url+"station/"+tests[self.currTestPoll].url)
+                    tests[self.currTestPoll].testNum = get.json()['number']
+                    tests[self.currTestPoll].name = get.json()['title']
+                    tests[self.currTestPoll].serial = get.json()['subtitle']
+                    tests[self.currTestPoll].status = get.json()['status']
+                    tests[self.currTestPoll].setData(get.json()['data'])
+                    tests[self.currTestPoll].setControls(get.json()['controls'])
+                    tests[self.currTestPoll].setOnline()
+
+                except Exception as e:
+                    tests[self.currTestPoll].setOffline()
+                self.currTestPoll += 1
+            if self.currTestPoll >= len(tests): #reset poll index to zero
+                self.currTestPoll = 0
+
+            sleep(pollPeriod)
+
+    def stop(self):
+        self.running = False
+
+#main 
+if __name__ == "__main__":
+    #startup configuration block
+
+    #add all themes from themes configuration file
+    try:
+        themefile = json.load(open("themes.json"))
+        #expects a list of JSON objects with attributes that can be used to initialize Theme objects
+        for kwargs in themefile:
+            themes.append(tkTheme.Theme(**kwargs))
+
+    except Exception as e:
+        messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from themes file", parent=root.focus_get())
+    finally:
+        if len(themes) == 0:
+            themes.append(T.theme) #default theme
+
+    #add all font options from font configuration file
+    try:
+        fontsfile = json.load(open("fonts.json"))
+        #expects a list of font family names
+        if "families" in fontsfile:
+            if isinstance(fontsfile["families"], list):
+                families.extend([oo for oo in fontsfile["families"] if oo in tkinter.font.families()])
+
+        #expects a list of integer sizes
+        if "sizes" in fontsfile:
+            if isinstance(fontsfile["sizes"], list):
+                sizes.extend([oo for oo in fontsfile["sizes"] if isinstance(oo, int)])
+
+    except Exception as e:
+        raise
+        messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from fonts file", parent=root.focus_get())
+    finally:
+        if len(families) == 0:
+            families.append(T.family) #default font family
+        if len(sizes) == 0:
+            sizes.append(T.size) #default font size
+
+    #configure on start up from config file
+    try:
+        conf = json.load(open("config.json"))
+
+        #sets the main url on startup.  "url" accepts a string value, which becomes the main url
+        if "url" in conf:
+            if isinstance(conf['url'], str):
+                main_url = conf['url']
+
+        #determines whether the program attempts to add all the stations from the server on startup.  "addAll" accepts a boolean value.
+        #If true, the program will attempt to contact the server and add all station
+        if "addAll" in conf:
+            if isinstance(conf['addAll'], bool):
+                if conf['addAll']:
+                    try:
+                        get = requests.get(main_url + 'index')
+                        for ii in range(len(get.json())):
+                            tests.append(Test(get.json()[ii]['url'], get.json()[ii]['number'], get.json()[ii]['title'], get.json()[ii]['subtitle']))
+                    except Exception as e:
+                        pass
+
+        #sets the display theme on startup.  "theme" accepts a string value.  If the value matches the name of a loaded theme, that theme will be selected, otherwise it will select the first loaded theme
+        if "theme" in conf:
+            if isinstance(conf['theme'], str):
+                T.set(theme=next((oo for oo in themes if oo.title == conf['theme']), themes[0]))
+
+        #sets the font family on startup.  "fontFamily" accepts a string value.  If the value is the name of a tkinter supported font, that font will be selected
+        if "fontFamily" in conf:
+            if conf["fontFamily"] in tkinter.font.families():
+                T.set(family=conf["fontFamily"])
+
+        #sets the font size on startup.  "fontSize" accepts an integer value to use as the size of the font
+        if "fontSize" in conf:
+            if isinstance(conf["fontSize"], int):
+                T.set(size=conf["fontSize"])
+
+    except Exception as e:
+        messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
+
+    #draw screen for the first time
+    update()
+        
+    poll = Polling()
+
+    #list of all threads
+    threads = []
+    threads.append(threading.Thread(target=poll.mainloop))
+    for oo in threads:
+        oo.start()
+    
+
+    root.mainloop()

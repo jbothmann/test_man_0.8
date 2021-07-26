@@ -17,6 +17,7 @@ import string
 import random
 import tkTheme #Local Import
 import tkinter.font
+import threading
 
 version = "0.8"
 
@@ -2097,7 +2098,16 @@ def serveStation(url):
     return
 #TODO: find a way to host the api without interrupting the rest of the program
 
-#PLC station polling function block
+#PLC station polling object #TODO: implement
+class Polling:
+    def init(self, port=None):
+        #counter for retrying message receptions
+        self.retryCount = 0
+        #couter keeping track of current test INDEX in tests array
+        self.currTestPoll = 0
+        ser = serial.Serial(port=port, baudrate=38400, parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=serTimeout) 
+        #initialize serial connection configuration, without selecting a port.  ser will not open until ser.open() is called
+
 
 #when given a binary message as a list of ints, returns a 16 bit MODBUS CRC as a list of ints
 def getCRC(msg):
@@ -2320,7 +2330,7 @@ def checkIfRunning(slID):
 retryCount = 0
 #couter keeping track of current test INDEX in tests array
 currTestPoll = 0
-              
+
 #main loop for recieving checking up and recieving from PLCs and continuing the GUI
 #if the loop encounters an error while parsing three times in a row, it will mark the test as offline and proceed to poll the next test
 while(running): #root.state() == 'normal'):

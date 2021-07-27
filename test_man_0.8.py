@@ -17,7 +17,7 @@ import string
 import random
 import tkTheme #Local Import
 import tkinter.font
-import threading
+import threading, queue
 
 version = "0.8"
 
@@ -25,12 +25,6 @@ serTimeout = 0.1
 
 numberOfData = 32
 numberOfControls = 32
-
-ser = serial.Serial(port = None, baudrate=38400, parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=serTimeout) 
-#initialize serial connection configuration, without selecting a port.  ser will not open until ser.open() is called
-
-api = flask.Flask(__name__, instance_relative_config=True)
-api.config.from_mapping(SECRET_KEY='dev')
 
 #base64 encoded bytestring which contains the favicon
 encoded_string = b'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAASQSURBVHhe7ZpdbBRVFMf/K61AgFKxfegmoA9SC0E0JGCIBqg0giH6Ag+KL2BEjU3E+PEkbJAHNDHVaAL4EYUH06A+iAFMSSG8WROFAm2wHyDGpppAhLZJW+luOZ7LnAnb7el054tpnPml/5x77+69e8+ZO/djpikC+C++3CU2tiQBEBtbkgCIjS1JAMTGliQAYmNLEgCxsSUJgNjYcmdOg6WlwPp1wIYNQHU1h32afMA/ffOmpBmTtntDJp3XtdFRSTCm3P7M2MI2bG61l/e9N94EenqsvI00FZ7q1hJ1dhCN5qLV0SNq/8IdAS+9COzdx1c84jstmwWWLQMu/CYFtwmvZ2tWTw3nDQcPqM4bwhkBd/M939oK1NRIQYQMDAAPcj+uXJGCsYRzebZtmxrOGxoaJnTeEPwImDcP6OywbNT09loXYmhYCsYT/AjI7Jgazht2vOPovCHYEWDW+PPnrHXfiWPHLOVyUhAQ5eXAqlW851gPtJ0Hlj/K3k3inglAYPrhe30NzlfbOaLp0/X6QenhpUQrV+qfFSi4ADxRqzucr6FBq3Na/YgUTABKSohaz+hO5+v17Xr9CBVMALZu0R3OVy5LVD5Xrx+h/E+Cs2cDHReAqrQUOGAOIqd/9Tn5cXd7/wb27we6L0qZD+xIeFZmp37Fw9ZAnzXvaH1yIX8jIF3FV583PbNmScEdpu868AgfcgqPuC7wtxHavTs65w3l9wA7eePlA+8jIM33/B+XgWn2w42IuNjNh51FknGP9xGwaWP0zhsGByXhDe8BqF0jCY+Yjh89AjQ28ra1beyjLDc0HpKER8wt4EktP+mzczH67luiysqx7VUvJPrqS6KRG3odTd1dvrfV3gOw7kmi69f0jjmp4QOiVEpv0+jxx4h6/tTrFuqZp/U2XMjfMjhnDrBiBW+GilwJRrJAU5P10zZVvJS+8jJw6hTQ0gLcGAGWPmQ9UXKiuZlPfU9Jxgd2JCJRaSnR6V9uX9E+HlHfHCLalRl7pQs1PES0qEZv06WiDcBzz+oOTqaPPtTb86BwngkWS12dJFxw9Sqw613J+Ke4ACxZAiyYL5kAqbhXEi7IZID+fsn4Z/JJ0Gx2fubJafFiYN9e3vt3WuWjsm7fGkgOa7h5DWbW+JMn+BT3lxQK9fXAJx9LpgjOngWW86Trdc+gYd8LE+r5zfp96FYD/USb+Z7Pb9ssh5s2EjX9SPTvsF7PVm7EWiLz6wcg5wDMmEF0+ZLeIa96/z1r9i/8rYoKou2vEWXZUa1e49fj6wQg5wC8/ZbeGb9qbyN6YSvRgvlEM2cSzS0jquWzffNx/fvX/iFKp/U++tTEc0BlBdDVBZSVSUFImNfe5v1hKiUFCvWvAp9+LplgmXgVMC8VwnbeYCZZJ+fNgemzLyQTPPoIWPgA0N4OlJRIQUSYU+JqPnUGuOwVoo+APXuid/4EL5treaMUovOG8SPg/vuAAwedh2VYmH9k+P0ScPgwH5qOW9NUyPg7Df4PiPYsMAVIAiA2tiQBEBtbkgCIjS1JAMTGliQAYmNLEgCxMQX4DxvJZiayMybCAAAAAElFTkSuQmCC'
@@ -49,7 +43,8 @@ def exitProgram():
     if not response is None:
         if response:
             saveSession()
-        running = False
+        root.destroy()
+        poll.destroy()
 
 root.protocol('WM_DELETE_WINDOW', exitProgram) #Override close button with exitProgram
 
@@ -359,93 +354,6 @@ defaultValNames = [
     "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
     ]
 
-#station control functions block
-
-def pause(slID):
-    if not ser.is_open:
-        messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
-    else:
-        msg = [
-            slID, #slave ID
-            0x05, #MODBUS Command (Force Single Coil)
-            0x40, #Coil Address (C50)
-            0x31,
-            0xFF, #set ON
-            0x00
-        ]
-        msg = msg + getCRC(msg) #append CRC
-        ser.write(bytes(msg))
-        sleep(serTimeout)
-        ser.reset_input_buffer()
-
-def resume(slID):
-    if not ser.is_open:
-        messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
-    else:
-        msg = [
-            slID, #slave ID
-            0x05, #MODBUS Command (Force Single Coil)
-            0x40, #Coil Address (C50)
-            0x31,
-            0x00, #set OFF
-            0x00
-        ]
-        msg = msg + getCRC(msg) #append CRC
-        ser.write(bytes(msg))
-        sleep(serTimeout)
-        ser.reset_input_buffer()
-
-def control(slID, controlIndex, value):
-    if not ser.is_open:
-        messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
-    else:
-        msg = [
-            slID, #slave ID
-            0x05, #MODBUS Command (Force Single Coil)
-            0x40, #Coil Address (C101 - C132)
-            (controlIndex + 0x63),
-            (value*0xFF), #set ON (0xFF) or OFF (0x00)
-            0x00
-        ]
-        msg = msg + getCRC(msg) #append CRC
-        ser.write(bytes(msg))
-        sleep(serTimeout)
-        ser.reset_input_buffer()
-
-def pauseAll():
-    if not ser.is_open:
-        messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
-    else:
-        msg = [
-            0x00, #address "0" to indicate a broadcast pause
-            0x05, #MODBUS Command (Force Single Coil)
-            0x40, #Coil Address (C50)
-            0x31,
-            0xFF, #set ON
-            0x00
-        ]
-        msg = msg + getCRC(msg) #append CRC
-        ser.write(bytes(msg))
-        sleep(serTimeout)
-        ser.reset_input_buffer()
-
-def resumeAll():
-    if not ser.is_open:
-        messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
-    else:
-        msg = [
-            0x00, #address "0" to indicate a broadcast pause
-            0x05, #MODBUS Command (Force Single Coil)
-            0x40, #Coil Address (C50)
-            0x31,
-            0x00, #set OFF
-            0x00
-        ]
-        msg = msg + getCRC(msg) #append CRC
-        ser.write(bytes(msg))
-        sleep(serTimeout)
-        ser.reset_input_buffer()
-
 #application functions block
                                   
 def saveSession():
@@ -527,7 +435,6 @@ def parseJSONsession(s):
     return newTests
         
 def connect(): #TODO: test com connection more thoroughly ?
-    global ser
     #setup the new menu
     tl = T.apply(Toplevel())
     tl.title('Connect')
@@ -542,8 +449,8 @@ def connect(): #TODO: test com connection more thoroughly ?
 
     #Add ports to dropdown menu, refresh interactable widgets
     def getCOMs():
-        if ser.is_open:
-            COMportHint.config(text="Connected to %s" % ser.port)
+        if poll.is_open():
+            COMportHint.config(text="Connected to %s" % poll.ser.port)
             disconnectCOMButton.config(state=NORMAL)
         else:
             COMportHint.config(text="Not Connected")
@@ -572,12 +479,11 @@ def connect(): #TODO: test com connection more thoroughly ?
 
     #connects the program to the chosen COM port
     def connectCOM():
-        global ser
-        global serTimeout
         try:
-            ser.port = 'COM%s' % (currentPortSelection)
-            if not ser.is_open:
-                ser.open()
+            poll.q.put(poll.changePort('COM%s' % (currentPortSelection)))
+            poll.q.join()
+            if not poll.is_open():
+                poll.q.put(poll.open())
             ser.reset_input_buffer()
         except serial.serialutil.SerialException:
             messagebox.showerror("Power Tools Test Manager", "Could not connect to COM port", parent=root.focus_get())
@@ -587,8 +493,8 @@ def connect(): #TODO: test com connection more thoroughly ?
 
     def disconnectCOM():
         global ser
-        if ser.is_open:
-            ser.close()
+        if poll.is_open():
+            poll.q.put(poll.close())
         update()
         getCOMs()
 
@@ -1812,6 +1718,22 @@ def theme():
     tl.update_idletasks()
     tl.minsize(width=max(tl.winfo_reqwidth(),300), height=max(tl.winfo_reqheight(),200))
 
+#serial command aliases for Polling object, temp
+def pause(slID):
+    poll.pause(slID)
+
+def resume(slID):
+    poll.resume(slID)
+
+def control(slID, controlIndex, value):
+    poll.control(slID, controlIndex, value)
+
+def pauseAll():
+    poll.pauseAll()
+
+def resumeAll():
+    poll.resumeAll()
+
 #build window block
 
 #declaring dataFrame, which will hold all test widgets
@@ -1872,104 +1794,6 @@ menubar.add_cascade(label="Control", menu=controlsMenu)
 # menubar.add_cascade(label="Test Comments", menu=testCommentsMenu)
 
 root.config(menu=menubar)
-
-#startup configuration block
-
-#add all themes from themes configuration file
-try:
-    themefile = json.load(open("themes.json"))
-    #expects a list of JSON objects with attributes that can be used to initialize Theme objects
-    for kwargs in themefile:
-        themes.append(tkTheme.Theme(**kwargs))
-
-except Exception as e:
-    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from themes file", parent=root.focus_get())
-finally:
-    if len(themes) == 0:
-        themes.append(T.theme) #default theme
-
-#add all font options from font configuration file
-try:
-    fontsfile = json.load(open("fonts.json"))
-    #expects a list of font family names
-    if "families" in fontsfile:
-        if isinstance(fontsfile["families"], list):
-            families.extend([oo for oo in fontsfile["families"] if oo in tkinter.font.families()])
-
-    #expects a list of integer sizes
-    if "sizes" in fontsfile:
-        if isinstance(fontsfile["sizes"], list):
-            sizes.extend([oo for oo in fontsfile["sizes"] if isinstance(oo, int)])
-
-except Exception as e:
-    raise
-    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from fonts file", parent=root.focus_get())
-finally:
-    if len(families) == 0:
-        families.append(T.family) #default font family
-    if len(sizes) == 0:
-        sizes.append(T.size) #default font size
-
-#configure from config file on startup
-try:
-    conf = json.load(open("config.json"))
-
-    #connect to a COM port on startup.  "port" accepts a value between 1 and 256, in the form of an int or a string "COM<value>"
-    if "port" in conf:
-        if isinstance(conf["port"], str):
-            if len(conf["port"]) > 3:
-                if conf["port"][:3] == "COM" and conf["port"][3:].isdigit():
-                    conf["port"] = int(conf["port"][3:])
-
-        if isinstance(conf["port"], int):
-            if conf["port"] > 0 and conf["port"] <= 256:
-                try:
-                    ser.port = 'COM%s' % (conf["port"])
-                    ser.open()
-                except serial.serialutil.SerialException:
-                    ser.close()
-                    pass
-
-    #open one or more session files on startup.  "file" accepts a string filepath, or a list of string filepaths
-    if "file" in conf:
-        if isinstance(conf["file"], str):
-            conf["file"] = [conf["file"]]
-        if isinstance(conf["file"], list):
-            for oo in conf["file"]:
-                if isinstance(oo, str):
-                    if os.path.isfile(oo):
-                        try:
-                            tests.extend(parseJSONsession(json.load(open(oo))))
-                        except Exception as e:
-                            pass
-
-    #locks the display on startup. "lock" accepts a boolean value, which locks the screen if true.  "pass" accepts a string value, which sets the password
-    if "lock" in conf:
-        if isinstance(conf["lock"], bool):
-            if conf["lock"]:
-                locked = True
-                if "pass" in conf:
-                    if isinstance(conf["pass"], str):
-                        passlocked = True
-                        password = conf["pass"]
-                
-    #sets the display theme on startup.  "theme" accepts a string value.  If the value matches the name of a loaded theme, that theme will be selected, otherwise it will select the first loaded theme
-    if "theme" in conf:
-        if isinstance(conf['theme'], str):
-            T.set(theme=next((oo for oo in themes if oo.title == conf['theme']), themes[0]))
-
-    #sets the font family on startup.  "fontFamily" accepts a string value.  If the value is the name of a tkinter supported font, that font will be selected
-    if "fontFamily" in conf:
-        if conf["fontFamily"] in tkinter.font.families():
-            T.set(family=conf["fontFamily"])
-
-    #sets the font size on startup.  "fontSize" accepts an integer value to use as the size of the font
-    if "fontSize" in conf:
-        if isinstance(conf["fontSize"], int):
-            T.set(size=conf["fontSize"])
-
-except Exception as e:
-    messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
 
 #Draws the screen with the current parameters
 def update():
@@ -2055,326 +1879,651 @@ def update():
     root.geometry(str(max(root.winfo_reqwidth(),400))+'x'+str(max(root.winfo_reqheight(),300)))
     root.minsize(width=max(root.winfo_reqwidth(),400), height=max(root.winfo_reqheight(),300))
 
-           
-#draw screen for the first time
-update()
 
 #API hosting block
 
-@api.route('/')
-def manifest():
-    return flask.json.jsonify({'app': 'Power Tools Test Manager', 'version': version})
+#TODO: revert?
+class Server:
+    def init(self, port=5000):
+        self.api = flask.Flask(__name__, instance_relative_config=True)
+        self.api.config.from_mapping(SECRET_KEY='dev')
+        self.api.add_url_rule('/', 'manifest', self.manifest)
+        self.api.add_url_rule('/index', 'index', self.index)
+        self.api.add_url_rule('/station/<url>', 'serve station', self.serveStation)
 
-@api.route('/index')
-def index():
-    return flask.json.jsonify([{
-        "url": oo.url,
-        "number": oo.testNum,
-        "title": oo.name,
-        "subtitle": oo.serial
-        } for oo in tests])
+        self.q = queue.Queue()
 
-@api.route('/station/<url>')
-def serveStation(url):
-    stationToServe = next([oo for oo in tests if oo.url == url], None)
-    if not stationToServe is None:
-        return flask.json.jsonify({
-            "url": stationToServe.url,
-            "number": stationToServe.testNum,
-            "title": stationToServe.name,
-            "subtitle": stationToServe.serial,
-            "status": stationToServe.status, 
-            "data": [{
-                "name": oo[0],
-                "units": oo[1],
-                "float": oo[2],
-                "show": oo[3]
-                }for oo in stationToServe.data],
-            "controls": [{
-                "name": oo[0],
-                "data": oo[1]
-                }for oo in stationToServe.controls]
-            })
-    return
+        self.running = False
+
+    def manifest(self):
+        return flask.json.jsonify({'app': 'Power Tools Test Manager', 'version': version})
+
+    def index(self):
+        return flask.json.jsonify([{
+            "url": oo.url,
+            "number": oo.testNum,
+            "title": oo.name,
+            "subtitle": oo.serial
+            } for oo in tests])
+
+    def serveStation(self, url):
+        stationToServe = next([oo for oo in tests if oo.url == url], None)
+        if not stationToServe is None:
+            return flask.json.jsonify({
+                "url": stationToServe.url,
+                "number": stationToServe.testNum,
+                "title": stationToServe.name,
+                "subtitle": stationToServe.serial,
+                "status": stationToServe.status, 
+                "data": [{
+                    "name": oo[0],
+                    "units": oo[1],
+                    "float": oo[2],
+                    "show": oo[3]
+                    }for oo in stationToServe.data],
+                "controls": [{
+                    "name": oo[0],
+                    "data": oo[1]
+                    }for oo in stationToServe.controls]
+                })
+        return
+
+    def mainloop(self):
+        pass
+
 #TODO: find a way to host the api without interrupting the rest of the program
 
-#PLC station polling object #TODO: implement
+#PLC station polling object #TODO: test
 class Polling:
-    def init(self, port=None):
+    def __init__(self, port=None):
+        #initialize serial connection configuration, without selecting a port.  ser will not open until ser.open() is called
+        self.ser = serial.Serial(port=None, baudrate=38400, parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=serTimeout)
+        self.ser.port = port
+        #boolean value that tracks if the mainloop is in execution
+        self.running = False
+        #queue for enqueueing functions to be run in the mainloop
+        self.q = queue.Queue()
         #counter for retrying message receptions
         self.retryCount = 0
         #couter keeping track of current test INDEX in tests array
         self.currTestPoll = 0
-        ser = serial.Serial(port=port, baudrate=38400, parity=serial.PARITY_ODD, stopbits=serial.STOPBITS_ONE, bytesize=serial.EIGHTBITS, timeout=serTimeout) 
-        #initialize serial connection configuration, without selecting a port.  ser will not open until ser.open() is called
 
-
-#when given a binary message as a list of ints, returns a 16 bit MODBUS CRC as a list of ints
-def getCRC(msg):
-    CRC = 0xFFFF
-    
-    for bx in msg: 
-        CRC ^= bx
-        for ii in range(8):
-            LSB = CRC & 0x0001 #extract LSB
-            CRC >>= 1 #right shift
-            if LSB == 1:
-                CRC ^= 0xA001 #xor per generation procedure
-
-    return[(CRC & 0x00FF), (CRC >> 8)] # return CRC as a list of two ints, swapped per generation procedure
-
-
-#retrieve, accepts a MODBUS slave ID to poll
-#composes and sends a MODBUS command which will instruct the PLC to return its data registers DF101-132
-#reads the returned message and decodes to retrieve data
-#returns a 2-tuple containing a boolean and an array containing the new data
-#returns true is the data message is acceptable, returns false if it detects an error or an empty message
-def retrieve(slID):
-    msg = [
-        slID, #slave ID
-        0x03, #MODBUS Command (Read Holding Registers)
-        0x70, #Starting Address (DF101)
-        0xC8,
-        (numberOfData*2) // 0x100, #No. of points (64) (32 Floats)
-        (numberOfData*2) % 0x100
-    ]
-    msg = msg + getCRC(msg) #append CRC
-    ser.write(bytes(msg))
-
-    b = ser.read(size=numberOfData*4+5)
-
-    #parse binary response
-    if b == b'':
-        #print("Error, nothing returned, "+str(slID))
-        return False, None
-    
-    if not len(b) == numberOfData*4+5: #133 bytes, 128 bytes for data (32x4 bytes/float) + 5
-        #print("Error, incorrect length, length was "+str(len(b)))
-        return False, None
-
-    if not b[0] == slID: #slave ID
-        #print("Error, wrong slID, slID was "+str(b[0])+", was polling "+str(slID))
-        return False, None
-
-    if not b[1] == 0x03: #MODBUS Command (Read Holding Registers)
-        #print("Error, wrong command returned, command was "+str(b[1]))
-        return False, None
-
-    crc = getCRC(b[0:-2])
-    if not [b[-2], b[-1]] == crc:
-        #print("Error, wrong CRC returned, CRC was "+hex(b[131])+hex(b[132])+", calculated "+hex(crc[0])+hex(crc[1]))
-        return False, None
-
-    dataVals = []
-    for ii in range(numberOfData):
-        dataVals.append(unpack('>f',bytes([b[ii*4+5], b[ii*4+6], b[ii*4+3], b[ii*4+4]]))[0]) #ammend byteswapping, and convert from IEEE-754 to python float with unpack()
+    #when given a binary message as a list of ints, returns a 16 bit MODBUS CRC as a list of ints.  Static helper function
+    def getCRC(msg):
+        CRC = 0xFFFF
         
-    return True, dataVals
+        for bx in msg: 
+            CRC ^= bx
+            for ii in range(8):
+                LSB = CRC & 0x0001 #extract LSB
+                CRC >>= 1 #right shift
+                if LSB == 1:
+                    CRC ^= 0xA001 #xor per generation procedure
 
-#retrieveControlStatus, accepts a MODBUS slave ID to poll
-#composes and sends a MODBUS command which will instruct the PLC to return its control coils C101-132
-#reads the returned message and decodes to retrieve data
-#returns a 2-tuple containing a boolean and an array containing the new data
-#returns true is the data message is acceptable, returns false if it detects an error or an empty message
-def retrieveControlStatus(slID):
-    msg = [
-        slID, #slave ID
-        0x01, #MODBUS Command (Read Coil Status)
-        0x40, #Starting Address (C101)
-        0x64,
-        numberOfControls // 0x100, #No. of points (32) (32 Coils)
-        numberOfControls % 0x100
-    ]
-    msg = msg + getCRC(msg) #append CRC
-    ser.write(bytes(msg))
+        return[(CRC & 0x00FF), (CRC >> 8)] # return CRC as a list of two ints, swapped per generation procedure
 
-    b = ser.read(size=-(-numberOfControls//8)+5) #upside down floor division does ceiling division
+    #station control functions block
 
-    #parse binary response
-    if b == b'':
-        #print("Error, nothing returned, "+str(slID))
-        return False, None
-    
-    if not len(b) == -(-numberOfControls//8)+5: #9 bytes, 4 bytes for data (32/8 coils/byte) + 5
-        #print("Error, incorrect length, length was "+str(len(b)))
-        return False, None
+    def pause(self, slID):
+        if not self.ser.is_open:
+            messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
+        else:
+            self.q.put(lambda self = self, slID = slID: self._pause(slID))
+            self.q.join()
 
-    if not b[0] == slID: #slave ID
-        #print("Error, wrong slID, slID was "+str(b[0])+", was polling "+str(slID))
-        return False, None
+    def _pause(self, slID):
+        if self.ser.is_open:
+            msg = [
+                slID, #slave ID
+                0x05, #MODBUS Command (Force Single Coil)
+                0x40, #Coil Address (C50)
+                0x31,
+                0xFF, #set ON
+                0x00
+            ]
+            msg = msg + Polling.getCRC(msg) #append CRC
+            self.ser.write(bytes(msg))
+            sleep(serTimeout)
+            self.ser.reset_input_buffer()
 
-    if not b[1] == 0x01: #MODBUS Command (Read Coil Status)
-        #print("Error, wrong command returned, command was "+str(b[1]))
-        return False, None
+    def resume(self, slID):
+        if not self.ser.is_open:
+            messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
+        else:
+            self.q.put(lambda self=self, slID=slID: self._resume(slID))
+            self.q.join()
 
-    crc = getCRC(b[0:-2])
-    if not [b[-2], b[-1]] == crc:
-        #print("Error, wrong CRC returned, CRC was "+hex(b[131])+hex(b[132])+", calculated "+hex(crc[0])+hex(crc[1]))
-        return False, None
+    def _resume(self, slID):
+        if self.ser.is_open:
+            msg = [
+                slID, #slave ID
+                0x05, #MODBUS Command (Force Single Coil)
+                0x40, #Coil Address (C50)
+                0x31,
+                0x00, #set OFF
+                0x00
+            ]
+            msg = msg + Polling.getCRC(msg) #append CRC
+            self.ser.write(bytes(msg))
+            sleep(serTimeout)
+            self.ser.reset_input_buffer()
 
-    dataVals = []
-    for ii in range(numberOfControls):
-        dataVals.append(bool((b[ii//8+3]) & (0x1 << ii%8))) #ammend bit ordering, and convert to a list of booleans
+    def control(self, slID, controlIndex, value):
+        if not self.ser.is_open:
+            messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
+        else:
+            self.q.put(lambda self=self, slID=slID, controlIndex=controlIndex, value=value: self._control(slID, controlIndex, value))
+            self.q.join()
+
+    def _control(self, slID, controlIndex, value):
+        if self.ser.is_open:
+            msg = [
+                slID, #slave ID
+                0x05, #MODBUS Command (Force Single Coil)
+                0x40, #Coil Address (C101 - C132)
+                (controlIndex + 0x63),
+                (value*0xFF), #set ON (0xFF) or OFF (0x00)
+                0x00
+            ]
+            msg = msg + Polling.getCRC(msg) #append CRC
+            self.ser.write(bytes(msg))
+            sleep(serTimeout)
+            self.ser.reset_input_buffer()
+
+    def pauseAll(self):
+        if not self.ser.is_open:
+            messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
+        else:
+            self.q.put(lambda self=self: self._pauseAll())
+            self.q.join()
+
+    def _pauseAll(self):
+        if self.ser.is_open:
+            msg = [
+                0x00, #address "0" to indicate a broadcast pause
+                0x05, #MODBUS Command (Force Single Coil)
+                0x40, #Coil Address (C50)
+                0x31,
+                0xFF, #set ON
+                0x00
+            ]
+            msg = msg + getCRC(msg) #append CRC
+            self.ser.write(bytes(msg))
+            sleep(serTimeout)
+            self.ser.reset_input_buffer()
+
+    def resumeAll(self):
+        if not self.ser.is_open:
+            messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
+        else:
+            self.q.put(lambda self=self: self._resumeAll())
+            self.q.join()
+
+    def _resumeAll(self):
+        if self.ser.is_open:
+            msg = [
+                0x00, #address "0" to indicate a broadcast pause
+                0x05, #MODBUS Command (Force Single Coil)
+                0x40, #Coil Address (C50)
+                0x31,
+                0x00, #set OFF
+                0x00
+            ]
+            msg = msg + Polling.getCRC(msg) #append CRC
+            self.ser.write(bytes(msg))
+            sleep(serTimeout)
+            self.ser.reset_input_buffer()
+
+    #retrieve, accepts a MODBUS slave ID to poll
+    #composes and sends a MODBUS command which will instruct the PLC to return its data registers DF101-132
+    #reads the returned message and decodes to retrieve data
+    #returns a 2-tuple containing a boolean and an array containing the new data
+    #returns true is the data message is acceptable, returns false if it detects an error or an empty message
+    def _retrieve(self, slID):
+        msg = [
+            slID, #slave ID
+            0x03, #MODBUS Command (Read Holding Registers)
+            0x70, #Starting Address (DF101)
+            0xC8,
+            (numberOfData*2) // 0x100, #No. of points (64) (32 Floats)
+            (numberOfData*2) % 0x100
+        ]
+        msg = msg + Polling.getCRC(msg) #append CRC
+        self.ser.write(bytes(msg))
+
+        b = self.ser.read(size=numberOfData*4+5)
+
+        #parse binary response
+        if b == b'':
+            #print("Error, nothing returned, "+str(slID))
+            return False, None
         
-    return True, dataVals
+        if not len(b) == numberOfData*4+5: #133 bytes, 128 bytes for data (32x4 bytes/float) + 5
+            #print("Error, incorrect length, length was "+str(len(b)))
+            return False, None
 
-#checkIfPaused(), accepts a MODBUS slave ID to poll.
-#composes a MODBUS command which will instruct the PLC to return the state of it's C50 register.
-#then parses the returned message, returning a 2-tuple
-#first value will return True if the response is acceptable, returns False if it detects an erroneous or empty message
-#second value returns True if the PLC is paused, False if not Paused, None otherwise
-#may raise SerialException
-def checkIfPaused(slID):
-    msg = [
-        slID, #slave ID
-        0x01, #MODBUS Command (Read Coil Status)
-        0x40, #Starting Address (C50) (Pause)
-        0x31,
-        0x00, #No. of points (1) (1 Coil)
-        0x01
-    ]
-    msg = msg + getCRC(msg) #append CRC
-    ser.write(bytes(msg))
+        if not b[0] == slID: #slave ID
+            #print("Error, wrong slID, slID was "+str(b[0])+", was polling "+str(slID))
+            return False, None
 
-    b = ser.read(size=6)
+        if not b[1] == 0x03: #MODBUS Command (Read Holding Registers)
+            #print("Error, wrong command returned, command was "+str(b[1]))
+            return False, None
 
-    #parse binary response
-    if b == b'':
-        #print("Error, nothing returned, address was"+str(slID))
-        return False, None
+        crc = Polling.getCRC(b[0:-2])
+        if not [b[-2], b[-1]] == crc:
+            #print("Error, wrong CRC returned, CRC was "+hex(b[131])+hex(b[132])+", calculated "+hex(crc[0])+hex(crc[1]))
+            return False, None
 
-    if not len(b) == 6: #6 bytes, 1 bytes for data + 5
-        #print("Error, incorrect length, length was "+str(len(b)))
-        return False, None
+        dataVals = []
+        for ii in range(numberOfData):
+            dataVals.append(unpack('>f',bytes([b[ii*4+5], b[ii*4+6], b[ii*4+3], b[ii*4+4]]))[0]) #ammend byteswapping, and convert from IEEE-754 to python float with unpack()
+            
+        return True, dataVals
 
-    if not b[0] == slID: #slave ID
-        #print("Error, wrong slID, slID was "+str(b[0])+", was polling "+str(slID))
-        return False, None
+    #retrieveControlStatus, accepts a MODBUS slave ID to poll
+    #composes and sends a MODBUS command which will instruct the PLC to return its control coils C101-132
+    #reads the returned message and decodes to retrieve data
+    #returns a 2-tuple containing a boolean and an array containing the new data
+    #returns true is the data message is acceptable, returns false if it detects an error or an empty message
+    def _retrieveControlStatus(self, slID):
+        msg = [
+            slID, #slave ID
+            0x01, #MODBUS Command (Read Coil Status)
+            0x40, #Starting Address (C101)
+            0x64,
+            numberOfControls // 0x100, #No. of points (32) (32 Coils)
+            numberOfControls % 0x100
+        ]
+        msg = msg + Polling.getCRC(msg) #append CRC
+        self.ser.write(bytes(msg))
 
-    if not b[1] == 0x01: #MODBUS Command (Read Coil Status)
-        #print("Error, wrong command returned, command was "+hex(b[1])+", expected 0x01")
-        return False, None
+        b = self.ser.read(size=-(-numberOfControls//8)+5) #upside down floor division does ceiling division
 
-    if not b[2] == 0x01: #Num data bytes (1)
-        #print("Error, incorrect byte count reported, "+str(b[2])+", expected 1")
-        return False, None
+        #parse binary response
+        if b == b'':
+            #print("Error, nothing returned, "+str(slID))
+            return False, None
+        
+        if not len(b) == -(-numberOfControls//8)+5: #9 bytes, 4 bytes for data (32/8 coils/byte) + 5
+            #print("Error, incorrect length, length was "+str(len(b)))
+            return False, None
 
-    crc = getCRC(b[0:4])
-    if not [b[4], b[5]] == crc:
-        #print("Error, wrong CRC returned, CRC was "+hex(b[4])+hex(b[5])+", calculated "+hex(crc[0])+hex(crc[1]))
-        return False, None
+        if not b[0] == slID: #slave ID
+            #print("Error, wrong slID, slID was "+str(b[0])+", was polling "+str(slID))
+            return False, None
 
-    if b[3] == 0x01: #C50 is set, test is paused
-        return True, True
-    elif b[3] == 0x00: #C50 is reset, test is not paused
-        return True, False
-    else:
-        #print("Error, value recieved was neither true or false, recieved "+hex(b[3]))
-        return False, None
-    
-#checkIfRunning(), accepts a MODBUS slave ID to poll.
-#composes a MODBUS command which will instruct the PLC to return the state of it's SC11 register.
-#then parses the returned message, returning a 2-tuple
-#first value will return True if the response is acceptable, returns False if it detects an erroneous or empty message
-#second value returns True if the PLC is in run mode, False if in stop mode, None otherwise
-#may raise SerialException
-def checkIfRunning(slID):
-    msg = [
-        slID, #slave ID
-        0x02, #MODBUS Command (Read Input Status)
-        0xF0, #Starting Address (SC11) (_PLC_Mode)
-        0x0A,
-        0x00, #No. of points (1) (1 Coils)
-        0x01
-    ]
-    msg = msg + getCRC(msg) #append CRC
-    ser.write(bytes(msg))
+        if not b[1] == 0x01: #MODBUS Command (Read Coil Status)
+            #print("Error, wrong command returned, command was "+str(b[1]))
+            return False, None
 
-    b = ser.read(size=6)
+        crc = Polling.getCRC(b[0:-2])
+        if not [b[-2], b[-1]] == crc:
+            #print("Error, wrong CRC returned, CRC was "+hex(b[131])+hex(b[132])+", calculated "+hex(crc[0])+hex(crc[1]))
+            return False, None
 
-    #parse binary response
-    if b == b'':
-        #print("Error, nothing returned, address was"+str(slID))
-        return False, None
+        dataVals = []
+        for ii in range(numberOfControls):
+            dataVals.append(bool((b[ii//8+3]) & (0x1 << ii%8))) #ammend bit ordering, and convert to a list of booleans
+            
+        return True, dataVals
 
-    if not len(b) == 6: #6 bytes, 1 bytes for data + 5
-        #print("Error, incorrect length, length was "+str(len(b)))
-        return False, None
+    #checkIfPaused(), accepts a MODBUS slave ID to poll.
+    #composes a MODBUS command which will instruct the PLC to return the state of it's C50 register.
+    #then parses the returned message, returning a 2-tuple
+    #first value will return True if the response is acceptable, returns False if it detects an erroneous or empty message
+    #second value returns True if the PLC is paused, False if not Paused, None otherwise
+    #may raise SerialException
+    def _checkIfPaused(self, slID):
+        msg = [
+            slID, #slave ID
+            0x01, #MODBUS Command (Read Coil Status)
+            0x40, #Starting Address (C50) (Pause)
+            0x31,
+            0x00, #No. of points (1) (1 Coil)
+            0x01
+        ]
+        msg = msg + Polling.getCRC(msg) #append CRC
+        self.ser.write(bytes(msg))
 
-    if not b[0] == slID: #slave ID
-        #print("Error, wrong slID, slID was "+str(b[0])+", was polling "+str(slID))
-        return False, None
+        b = self.ser.read(size=6)
 
-    if not b[1] == 0x02: #MODBUS Command (Read Input Status)
-        #print("Error, wrong command returned, command was "+hex(b[1])+", expected 0x01")
-        return False, None
+        #parse binary response
+        if b == b'':
+            #print("Error, nothing returned, address was"+str(slID))
+            return False, None
 
-    if not b[2] == 0x01: #Num data bytes (1)
-        #print("Error, incorrect byte count reported, "+str(b[2])+", expected 1")
-        return False, None
+        if not len(b) == 6: #6 bytes, 1 bytes for data + 5
+            #print("Error, incorrect length, length was "+str(len(b)))
+            return False, None
 
-    crc = getCRC(b[0:4])
-    if not [b[4], b[5]] == crc:
-        #print("Error, wrong CRC returned, CRC was "+hex(b[4])+hex(b[5])+", calculated "+hex(crc[0])+hex(crc[1]))
-        return False, None
+        if not b[0] == slID: #slave ID
+            #print("Error, wrong slID, slID was "+str(b[0])+", was polling "+str(slID))
+            return False, None
 
-    if b[3] == 0x01: #SC11 is set, PLC is in Run mode
-        return True, True
-    elif b[3] == 0x00: #SC11 is reset, PLC is in Stop mode
-        return True, False
-    else:
-        #print("Error, value recieved was neither true or false, recieved "+hex(b[3]))
-        return False, None
+        if not b[1] == 0x01: #MODBUS Command (Read Coil Status)
+            #print("Error, wrong command returned, command was "+hex(b[1])+", expected 0x01")
+            return False, None
 
-#counter for retrying message receptions
-retryCount = 0
-#couter keeping track of current test INDEX in tests array
-currTestPoll = 0
+        if not b[2] == 0x01: #Num data bytes (1)
+            #print("Error, incorrect byte count reported, "+str(b[2])+", expected 1")
+            return False, None
 
-#main loop for recieving checking up and recieving from PLCs and continuing the GUI
-#if the loop encounters an error while parsing three times in a row, it will mark the test as offline and proceed to poll the next test
-while(running): #root.state() == 'normal'):
-    if ser.is_open: #If connected to a serial port 
-        if currTestPoll < len(tests) and tests[currTestPoll].testNum > 0 and tests[currTestPoll].testNum <= 247:
-            #ensure that the index is not out of bounds, which could possibly be caused by deleting tests, and check if test is associated with a valid slave ID before retrieving
-            #print(f'{tests[currTestPoll].testNum:03d}')
+        crc = Polling.getCRC(b[0:4])
+        if not [b[4], b[5]] == crc:
+            #print("Error, wrong CRC returned, CRC was "+hex(b[4])+hex(b[5])+", calculated "+hex(crc[0])+hex(crc[1]))
+            return False, None
+
+        if b[3] == 0x01: #C50 is set, test is paused
+            return True, True
+        elif b[3] == 0x00: #C50 is reset, test is not paused
+            return True, False
+        else:
+            #print("Error, value recieved was neither true or false, recieved "+hex(b[3]))
+            return False, None
+        
+    #checkIfRunning(), accepts a MODBUS slave ID to poll.
+    #composes a MODBUS command which will instruct the PLC to return the state of it's SC11 register.
+    #then parses the returned message, returning a 2-tuple
+    #first value will return True if the response is acceptable, returns False if it detects an erroneous or empty message
+    #second value returns True if the PLC is in run mode, False if in stop mode, None otherwise
+    #may raise SerialException
+    def _checkIfRunning(self, slID):
+        msg = [
+            slID, #slave ID
+            0x02, #MODBUS Command (Read Input Status)
+            0xF0, #Starting Address (SC11) (_PLC_Mode)
+            0x0A,
+            0x00, #No. of points (1) (1 Coils)
+            0x01
+        ]
+        msg = msg + Polling.getCRC(msg) #append CRC
+        self.ser.write(bytes(msg))
+
+        b = self.ser.read(size=6)
+
+        #parse binary response
+        if b == b'':
+            #print("Error, nothing returned, address was"+str(slID))
+            return False, None
+
+        if not len(b) == 6: #6 bytes, 1 bytes for data + 5
+            #print("Error, incorrect length, length was "+str(len(b)))
+            return False, None
+
+        if not b[0] == slID: #slave ID
+            #print("Error, wrong slID, slID was "+str(b[0])+", was polling "+str(slID))
+            return False, None
+
+        if not b[1] == 0x02: #MODBUS Command (Read Input Status)
+            #print("Error, wrong command returned, command was "+hex(b[1])+", expected 0x01")
+            return False, None
+
+        if not b[2] == 0x01: #Num data bytes (1)
+            #print("Error, incorrect byte count reported, "+str(b[2])+", expected 1")
+            return False, None
+
+        crc = Polling.getCRC(b[0:4])
+        if not [b[4], b[5]] == crc:
+            #print("Error, wrong CRC returned, CRC was "+hex(b[4])+hex(b[5])+", calculated "+hex(crc[0])+hex(crc[1]))
+            return False, None
+
+        if b[3] == 0x01: #SC11 is set, PLC is in Run mode
+            return True, True
+        elif b[3] == 0x00: #SC11 is reset, PLC is in Stop mode
+            return True, False
+        else:
+            #print("Error, value received was neither true or false, received "+hex(b[3]))
+            return False, None
+
+    def upkeep(self):
+        if self.ser.is_open:
+            self.q.put(lambda self=self: self._upkeep())
+            self.q.join()
+
+    def _upkeep(self):
+        if self.ser.is_open: #If connected to a serial port 
+            if self.currTestPoll < len(tests) and tests[self.currTestPoll].testNum > 0 and tests[self.currTestPoll].testNum <= 247:
+                #ensure that the index is not out of bounds, which could possibly be caused by deleting tests, and check if test is associated with a valid slave ID before retrieving
+                try:
+                    retSuccess, newData = self.retrieve(tests[self.currTestPoll].testNum) #send requests
+                    pauseSuccess, isPaused = self.checkIfPaused(tests[self.currTestPoll].testNum)
+                    runSuccess, isRunning = self.checkIfRunning(tests[self.currTestPoll].testNum)
+                    contSuccess, contStatus = self.retrieveControlStatus(tests[self.currTestPoll].testNum)
+
+                    if retSuccess and pauseSuccess and runSuccess and contSuccess: #ensure that all requests were successful
+                        #update test status based on results
+                        if not isRunning:
+                            tests[self.currTestPoll].setStopped()
+                        elif isPaused:
+                            tests[self.currTestPoll].setPaused()
+                        else:
+                            tests[self.currTestPoll].setNormal()
+                            
+                        tests[self.currTestPoll].set(newData)
+                        tests[self.currTestPoll].setControlStatus(contStatus)
+                        self.currTestPoll += 1 #Increment to next test in list
+                        self.retryCount = 0 #Reset retry counter
+                    else: 
+                        self.retryCount += 1
+                except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
+                    self.close()
+                    for oo in tests:
+                        oo.setOffline()
+                    #messagebox.showerror("Power Tools Test Manager", "Serial Port Disconnected", parent=root.focus_get()) #this makes a call to tkinter from another thread, which will crash the program
+            if self.retryCount >= 3: #If the same test has been polled three times, with no response or bad responses, set the test as offline and continue
+                if self.currTestPoll < len(tests):
+                    tests[self.currTestPoll].setOffline()
+                self.currTestPoll += 1
+                self.retryCount = 0
+            if self.currTestPoll >= len(tests): #reset poll index to zero
+                self.currTestPoll = 0
+        self.q.task_done()
+
+    #main loop for receiving checking up and receiving from PLCs and continuing the GUI
+    def mainloop(self):
+        global tests
+        #if the loop encounters an error while parsing three times in a row, it will mark the test as offline and proceed to poll the next test
+        while(self.running): #root.state() == 'normal'):
+            if not self.q.empty():
+                self.q.get()() #perform the queued function
+                self.q.task_done() #indicate that the enqueued task has been executed
+            else:
+                if self.ser.is_open: #If connected to a serial port 
+                    if self.currTestPoll < len(tests) and tests[self.currTestPoll].testNum > 0 and tests[self.currTestPoll].testNum <= 247:
+                        #ensure that the index is not out of bounds, which could possibly be caused by deleting tests, and check if test is associated with a valid slave ID before retrieving
+                        try:
+                            retSuccess, newData = self.retrieve(tests[self.currTestPoll].testNum) #send requests
+                            pauseSuccess, isPaused = self.checkIfPaused(tests[self.currTestPoll].testNum)
+                            runSuccess, isRunning = self.checkIfRunning(tests[self.currTestPoll].testNum)
+                            contSuccess, contStatus = self.retrieveControlStatus(tests[self.currTestPoll].testNum)
+
+                            if retSuccess and pauseSuccess and runSuccess and contSuccess: #ensure that all requests were successful
+                                #update test status based on results
+                                if not isRunning:
+                                    tests[self.currTestPoll].setStopped()
+                                elif isPaused:
+                                    tests[self.currTestPoll].setPaused()
+                                else:
+                                    tests[self.currTestPoll].setNormal()
+                                    
+                                tests[self.currTestPoll].set(newData)
+                                tests[self.currTestPoll].setControlStatus(contStatus)
+                                self.currTestPoll += 1 #Increment to next test in list
+                                self.retryCount = 0 #Reset retry counter
+                            else: 
+                                self.retryCount += 1
+                        except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
+                            self.ser.close()
+                            self.currTestPoll = 0
+                            self.retryCount = 0
+                            for oo in tests:
+                                oo.setOffline()
+                            #messagebox.showerror("Power Tools Test Manager", "Serial Port Disconnected", parent=root.focus_get()) #this makes a call to tkinter from another thread, which will crash the program
+                    if self.retryCount >= 3: #If the same test has been polled three times, with no response or bad responses, set the test as offline and continue
+                        if self.currTestPoll < len(tests):
+                            tests[self.currTestPoll].setOffline()
+                        self.currTestPoll += 1
+                        self.retryCount = 0
+                    if self.currTestPoll >= len(tests): #reset poll index to zero
+                        self.currTestPoll = 0
+
+    #thread control queueables
+    def change_port(self, newPort):
+        self.q.put(lambda self=self, newPort=newPort: self._change_port(newPort))
+        self.q.join()
+
+    def _change_port(self, newPort):
+        try:
+            self.ser.port = 'COM%s' % (conf["port"])
+        except serial.serialutil.SerialException:
+            self.ser.close()
+        self.q.task_done()
+
+    def open(self):
+        if not self.ser.is_open:
+            self.q.put(lambda self=self: self._open())
+            self.q.join()
+            self.currTestPoll = 0
+            self.retryCount = 0
+
+    def _open(self):
+        if not self.ser.is_open:
             try:
-                retSuccess, newData = retrieve(tests[currTestPoll].testNum) #send requests
-                pauseSuccess, isPaused = checkIfPaused(tests[currTestPoll].testNum)
-                runSuccess, isRunning = checkIfRunning(tests[currTestPoll].testNum)
-                contSuccess, contStatus = retrieveControlStatus(tests[currTestPoll].testNum)
+                self.ser.open()
+            except serial.serialutil.SerialException:
+                self.ser.close()
+        self.q.task_done()
 
-                if retSuccess and pauseSuccess and runSuccess and contSuccess: #ensure that all requests were successful
-                    #update test status based on results
-                    if not isRunning:
-                        tests[currTestPoll].setStopped()
-                    elif isPaused:
-                        tests[currTestPoll].setPaused()
-                    else:
-                        tests[currTestPoll].setNormal()
-                        
-                    tests[currTestPoll].set(newData)
-                    tests[currTestPoll].setControlStatus(contStatus)
-                    currTestPoll += 1 #Increment to next test in list
-                    retryCount = 0 #Reset retry counter
-                else: 
-                    retryCount += 1
-            except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
-                ser.close()
-                currTestPoll = 0
-                retryCount = 0
-                for oo in tests:
-                    oo.setOffline()
-                messagebox.showerror("Power Tools Test Manager", "Serial Port Disconnected", parent=root.focus_get())
-        if retryCount >= 3: #If the same test has been polled three times, with no response or bad responses, set the test as offline and continue
-            if currTestPoll < len(tests):
-                tests[currTestPoll].setOffline()
-            currTestPoll += 1
-            retryCount = 0
-        if currTestPoll >= len(tests): #reset poll index to zero
-            currTestPoll = 0
-    root.update() #maintain root window
-root.destroy()
-if ser.is_open:
-    ser.close()
-#root.mainloop()
+
+    def close(self):
+        if self.ser.is_open:
+            self.q.put(lambda self=self: self._close())
+            self.q.join()
+
+    def _close(self):
+        if self.ser.is_open:
+            self.ser.close()
+        for oo in tests:
+            oo.setOffline()
+        self.q.task_done()
+
+
+    #destructor that will end the main loop
+    def destroy(self):
+        self.close()
+        self.running = False
+
+    #returns whether a serial connection is open.  Free to be called from anywhere in the program
+    def is_open(self):
+        return self.ser.is_open
+
+#main
+if __name__ == "__main__":
+    #startup configuration block
+
+    ser_port = None
+
+    #add all themes from themes configuration file
+    try:
+        themefile = json.load(open("themes.json"))
+        #expects a list of JSON objects with attributes that can be used to initialize Theme objects
+        for kwargs in themefile:
+            themes.append(tkTheme.Theme(**kwargs))
+
+    except Exception as e:
+        messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from themes file", parent=root.focus_get())
+    finally:
+        if len(themes) == 0:
+            themes.append(T.theme) #default theme
+
+    #add all font options from font configuration file
+    try:
+        fontsfile = json.load(open("fonts.json"))
+        #expects a list of font family names
+        if "families" in fontsfile:
+            if isinstance(fontsfile["families"], list):
+                families.extend([oo for oo in fontsfile["families"] if oo in tkinter.font.families()])
+
+        #expects a list of integer sizes
+        if "sizes" in fontsfile:
+            if isinstance(fontsfile["sizes"], list):
+                sizes.extend([oo for oo in fontsfile["sizes"] if isinstance(oo, int)])
+
+    except Exception as e:
+        raise
+        messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from fonts file", parent=root.focus_get())
+    finally:
+        if len(families) == 0:
+            families.append(T.family) #default font family
+        if len(sizes) == 0:
+            sizes.append(T.size) #default font size
+
+    #configure from config file on startup
+    try:
+        conf = json.load(open("config.json"))
+
+        #connect to a COM port on startup.  "port" accepts a value between 1 and 256, in the form of an int or a string "COM<value>"
+        if "port" in conf:
+            if isinstance(conf["port"], str):
+                if len(conf["port"]) > 3:
+                    if conf["port"][:3] == "COM" and conf["port"][3:].isdigit():
+                        conf["port"] = int(conf["port"][3:])
+
+            if isinstance(conf["port"], int):
+                if conf["port"] > 0 and conf["port"] <= 256:
+                    ser_port = 'COM%s' % (conf["port"])
+
+        #open one or more session files on startup.  "file" accepts a string filepath, or a list of string filepaths
+        if "file" in conf:
+            if isinstance(conf["file"], str):
+                conf["file"] = [conf["file"]]
+            if isinstance(conf["file"], list):
+                for oo in conf["file"]:
+                    if isinstance(oo, str):
+                        if os.path.isfile(oo):
+                            try:
+                                tests.extend(parseJSONsession(json.load(open(oo))))
+                            except Exception as e:
+                                pass
+
+        #locks the display on startup. "lock" accepts a boolean value, which locks the screen if true.  "pass" accepts a string value, which sets the password
+        if "lock" in conf:
+            if isinstance(conf["lock"], bool):
+                if conf["lock"]:
+                    locked = True
+                    if "pass" in conf:
+                        if isinstance(conf["pass"], str):
+                            passlocked = True
+                            password = conf["pass"]
+                    
+        #sets the display theme on startup.  "theme" accepts a string value.  If the value matches the name of a loaded theme, that theme will be selected, otherwise it will select the first loaded theme
+        if "theme" in conf:
+            if isinstance(conf['theme'], str):
+                T.set(theme=next((oo for oo in themes if oo.title == conf['theme']), themes[0]))
+
+        #sets the font family on startup.  "fontFamily" accepts a string value.  If the value is the name of a tkinter supported font, that font will be selected
+        if "fontFamily" in conf:
+            if conf["fontFamily"] in tkinter.font.families():
+                T.set(family=conf["fontFamily"])
+
+        #sets the font size on startup.  "fontSize" accepts an integer value to use as the size of the font
+        if "fontSize" in conf:
+            if isinstance(conf["fontSize"], int):
+                T.set(size=conf["fontSize"])
+
+    except Exception as e:
+        messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
+
+    #draw screen for the first time
+    update()
+
+    poll = Polling(ser_port)
+
+    #list of all threads
+    threads = []
+    threads.append(threading.Thread(target=poll.mainloop))
+    for oo in threads:
+        oo.start()
+    root.mainloop()
+

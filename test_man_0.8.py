@@ -211,6 +211,8 @@ class Test:
         #self.button0.grid(row=0, column=1, sticky=E, pady=0)
         self.button1.grid(row=4, pady=2)
         self.button2.grid(row=5)
+
+        self.periodicCall()
     
        
     #Test.draw, draws the information to the screen based on internal info
@@ -242,11 +244,11 @@ class Test:
         self.dataLabel.config(text=self.toString())
         if self.status == Test.NORMAL:
             self.statusIndicator.config(text="\U00002B24   In Progress", fg="green")
-            self.button1.config(text="Pause", command=lambda: pause(self.testNum), state=NORMAL)
+            self.button1.config(text="Pause", command=lambda poll=poll, slID = self.testNum: poll.pause(slID), state=NORMAL)
             self.button2.config(text="More Controls", command=lambda: openControls(self.testNum), state=NORMAL)
         elif self.status == Test.PAUSED:
             self.statusIndicator.config(text="\U00002B24   Paused", fg=T.theme.fg)
-            self.button1.config(text="Resume", command=lambda: resume(self.testNum), state=NORMAL)
+            self.button1.config(text="Resume", command=lambda poll=poll, slID = self.testNum: poll.resume(slID), state=NORMAL)
             self.button2.config(text="More Controls", command=lambda: openControls(self.testNum), state=NORMAL)
         elif self.status == Test.STOPPED:
             self.statusIndicator.config(text="\U00002B24   Stopped", fg="orange")
@@ -272,31 +274,31 @@ class Test:
         root.update_idletasks()
         root.minsize(width=max(root.winfo_reqwidth(),400), height=max(root.winfo_reqheight(),300))
 
+    def periodicCall(self): #TODO: document
+        if self.showTest == True:
+            self.updateLabel()
+        root.after(1000, self.periodicCall) #schedule next call, in ms
+
     def set(self, newData):
         for ii in range(len(newData)):
             self.data[ii][2] = newData[ii]
-        self.updateLabel()
 
     #four methods for updating the test's status, which will also update the datalabel:
     def setNormal(self):
         if not self.status == Test.NORMAL:
             self.status = Test.NORMAL
-            self.updateLabel()
 
     def setPaused(self):
         if not self.status == Test.PAUSED:
             self.status = Test.PAUSED
-            self.updateLabel()
 
     def setStopped(self): #unused state
         if not self.status == Test.STOPPED:
             self.status = Test.STOPPED
-            self.updateLabel()
 
     def setOffline(self):
         if not self.status == Test.OFFLINE:
             self.status = Test.OFFLINE
-            self.updateLabel()
 
     #appends a new comment to the test
     def addComment(self, phrase):
@@ -479,22 +481,16 @@ def connect(): #TODO: test com connection more thoroughly ?
 
     #connects the program to the chosen COM port
     def connectCOM():
-        try:
-            poll.q.put(poll.changePort('COM%s' % (currentPortSelection)))
-            poll.q.join()
-            if not poll.is_open():
-                poll.q.put(poll.open())
-            ser.reset_input_buffer()
-        except serial.serialutil.SerialException:
-            messagebox.showerror("Power Tools Test Manager", "Could not connect to COM port", parent=root.focus_get())
-        else:
-            update()
-            getCOMs()
+        nonlocal currentPortSelection
+        print("test1")
+        if currentPortSelection > 0 and currentPortSelection <= 256:
+            poll.change_port(currentPortSelection)
+            poll.open()
+        update()
+        getCOMs()
 
     def disconnectCOM():
-        global ser
-        if poll.is_open():
-            poll.q.put(poll.close())
+        poll.close()
         update()
         getCOMs()
 
@@ -1406,7 +1402,7 @@ def openControls(InitialTestNum=0):
     if len(tests) == 0:
         messagebox.showerror("Power Tools Test Manager", "There are no stations to control", parent=root.focus_get())
         return
-    if not ser.is_open:
+    if not poll.is_open():
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
         return
     #setup the new menu
@@ -1452,7 +1448,7 @@ def openControls(InitialTestNum=0):
 
     #update() is called whenever a new selection is made on the dropdown menu.  It reconfigures the window to reflect what was chosen.
     #if update() is passed an invalid index, then it will show a default selection
-    def update(testIndex):
+    def update(testIndex): #TODO: fix
         nonlocal currentTestIndex
         currentTestIndex=testIndex
         if (currentTestIndex>=0): 
@@ -1524,7 +1520,7 @@ def pauseTests():
     if len(tests) == 0:
         messagebox.showerror("Power Tools Test Manager", "There are no stations to control", parent=root.focus_get())
         return
-    if not ser.is_open:
+    if not poll.is_open():
         messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
         return
     #setup the new menu
@@ -1553,51 +1549,23 @@ def pauseTests():
         stationLabels[-1].grid(column=(testIndexDict[oo.testNum]%10)*2, row=(testIndexDict[oo.testNum]//10)*2, padx=2, pady=3)
         pauseButtons[-1].grid(column=(testIndexDict[oo.testNum]%10)*2, row=(testIndexDict[oo.testNum]//10)*2+1, padx=2, pady=3)
 
-    #wrapper functions which refresh the dialog after their message has been sent
-    def sendPause(slID):
-        pause(slID)
-        refresh()
-
-    def sendResume(slID):
-        resume(slID)
-        refresh()
-
-    def sendPauseAll():
-        pauseAll()
-        refresh()
-
-    def sendResumeAll():
-        resumeAll()
-        refresh()
+    #with refresh is sort of like a decorator.  It takes a function f, and returns a new function w that executes f, and also refreshes this window.  
+    #used during function assignment of UI controls
+    def withRefresh(f):
+        def w():
+            f()
+            refresh()
+        return w
 
     #queries all test stations for their pause status and update controls to reflect
     def refresh():
-        for oo in tests:
-            retryCount = 0
-            done = False
-            while not done:  #If the data retrieval is unsuccessful, Try three times before showing that the PLC is offline
-                rSuccess, isRunning = checkIfRunning(oo.testNum)
-                pSuccess, isPaused = checkIfPaused(oo.testNum)
-                if rSuccess and pSuccess:  #The data retrieval has been successful.  Exit the loop and populate control with current data
-                    done = True
-                    if not isRunning:
-                        tests[currTestPoll].setStopped()
-                    elif isPaused:
-                        tests[currTestPoll].setPaused()
-                    else:
-                        tests[currTestPoll].setNormal()
-                        
-                else:
-                    retryCount += 1 #try again
-
-                if retryCount >= 3:  #The data retrieval has been unsuccessful three times.  Exit the loop and show control offline
-                    done = True
-                    oo.setOffline()
+        for oo in tests: #TODO fix
+            poll.retrieveStatus(oo)
 
             if oo.status == Test.NORMAL:
-                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.NORMAL, fg="green", state=NORMAL, command=lambda x=oo: sendPause(x.testNum))
+                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.NORMAL, fg="green", state=NORMAL, command=lambda: withRefresh(lambda x=oo: poll.pause(x.testNum))())
             elif oo.status == Test.PAUSED:
-                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.PAUSED, fg=T.theme.fg, state=NORMAL, command=lambda x=oo: sendResume(x.testNum))
+                pauseButtons[testIndexDict[oo.testNum]].config(text=Test.PAUSED, fg=T.theme.fg, state=NORMAL, command=lambda: withRefresh(lambda x=oo: poll.resume(x.testNum))())
             elif oo.status == Test.STOPPED:
                 pauseButtons[testIndexDict[oo.testNum]].config(text=Test.STOPPED.upper(), fg="orange", state=DISABLED, command=None)
             elif oo.status == Test.OFFLINE:    
@@ -1606,12 +1574,11 @@ def pauseTests():
     #populate the screen with current information for the first time
     refresh()
 
-
     #Pause all button
-    T.apply(Button(botFrame, text="Pause All Tests", command=sendPauseAll)).grid(row=0, column=0, padx=5, pady=5)
+    T.apply(Button(botFrame, text="Pause All Tests", command=lambda: withRefresh(pauseAll)())).grid(row=0, column=0, padx=5, pady=5)
 
     #Resume all button
-    T.apply(Button(botFrame, text="Resume All Tests", command=sendResumeAll)).grid(row=0, column=1, padx=5, pady=5)
+    T.apply(Button(botFrame, text="Resume All Tests", command=lambda: withRefresh(sendResumeAll)())).grid(row=0, column=1, padx=5, pady=5)
 
     #refresh button
     T.apply(Button(botFrame, text="Refresh", command=refresh)).grid(row=0, column=2, padx=5, pady=5)
@@ -1868,7 +1835,7 @@ def update():
     T.apply([fileMenu, functionsMenu, viewMenu, lockSubMenu, controlsMenu])
     # T.apply(testCommentsMenu)
     
-    if locked or len(tests) == 0 or not ser.is_open:
+    if locked or len(tests) == 0 or not poll.is_open():
         pauseAllButton.config(state=DISABLED)
         resumeAllButton.config(state=DISABLED)
     else:
@@ -1943,10 +1910,6 @@ class Polling:
         self.running = False
         #queue for enqueueing functions to be run in the mainloop
         self.q = queue.Queue()
-        #counter for retrying message receptions
-        self.retryCount = 0
-        #couter keeping track of current test INDEX in tests array
-        self.currTestPoll = 0
 
     #when given a binary message as a list of ints, returns a 16 bit MODBUS CRC as a list of ints.  Static helper function
     def getCRC(msg):
@@ -1964,11 +1927,11 @@ class Polling:
 
     #station control functions block
 
-    def pause(self, slID):
+    def pause(self, theTest):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
         else:
-            self.q.put(lambda self = self, slID = slID: self._pause(slID))
+            self.q.put(lambda self = self, slID = theTest.testNum: self._pause(slID))
             self.q.join()
 
     def _pause(self, slID):
@@ -1986,11 +1949,11 @@ class Polling:
             sleep(serTimeout)
             self.ser.reset_input_buffer()
 
-    def resume(self, slID):
+    def resume(self, theTest):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
         else:
-            self.q.put(lambda self=self, slID=slID: self._resume(slID))
+            self.q.put(lambda self=self, slID=theTest.testNum: self._resume(slID))
             self.q.join()
 
     def _resume(self, slID):
@@ -2008,11 +1971,11 @@ class Polling:
             sleep(serTimeout)
             self.ser.reset_input_buffer()
 
-    def control(self, slID, controlIndex, value):
+    def control(self, theTest, controlIndex, value):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
         else:
-            self.q.put(lambda self=self, slID=slID, controlIndex=controlIndex, value=value: self._control(slID, controlIndex, value))
+            self.q.put(lambda self=self, slID=theTest.testNum, controlIndex=controlIndex, value=value: self._control(slID, controlIndex, value))
             self.q.join()
 
     def _control(self, slID, controlIndex, value):
@@ -2074,12 +2037,44 @@ class Polling:
             sleep(serTimeout)
             self.ser.reset_input_buffer()
 
-    #retrieve, accepts a MODBUS slave ID to poll
+    def retrieveData(self, theTest):
+        if not self.ser.is_open:
+            messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
+        else:
+            self.q.put(lambda self=self, theTest=theTest: self._retrieveData(theTest))
+            self.q.join()
+
+    #_retrieveData, private method that will update the given test's data based on the results of __checkData
+    def _retrieveData(self, theTest):
+        retryCount = 0 #set retry count to 0, communication will be attempted 3 times before setting the station as offline
+        done = False #loop break condition
+        if not theTest is None and theTest.testNum > 0 and theTest.testNum <= 247 and self.ser.is_open: #If test exists, has a valid slave ID, and serial port is connected
+            while not done:
+                try:
+                    success, newData = self.__checkData(theTest.testNum)
+
+                    if success: #ensure that all requests were successful
+                            
+                        theTest.set(newData)
+                        done = True #exit upon success
+                    else: 
+                        retryCount += 1
+                except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
+                    self.close()
+                    global tests
+                    for oo in tests:
+                        oo.setOffline()
+                    done = True #exit upon error
+                if retryCount >= 3: #If the same test has been polled three times, with no response or bad responses, set the test as offline and continue
+                    theTest.setOffline()
+                    done = True #exit upon 3 unsuccessful retries
+
+    #__checkData(), accepts a MODBUS slave ID to poll
     #composes and sends a MODBUS command which will instruct the PLC to return its data registers DF101-132
     #reads the returned message and decodes to retrieve data
     #returns a 2-tuple containing a boolean and an array containing the new data
     #returns true is the data message is acceptable, returns false if it detects an error or an empty message
-    def _retrieve(self, slID):
+    def __checkData(self, slID):
         msg = [
             slID, #slave ID
             0x03, #MODBUS Command (Read Holding Registers)
@@ -2121,12 +2116,43 @@ class Polling:
             
         return True, dataVals
 
+    def retrieveControls(self, theTest):
+        if not self.ser.is_open:
+            messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
+        else:
+            self.q.put(lambda self=self, theTest=theTest: self._retrieveControls(theTest))
+            self.q.join()
+
+    #_retrieveControls, private method that will update the given test's controls based on the results of __checkControls()
+    def _retrieveControls(self, theTest):
+        retryCount = 0 #set retry count to 0, communication will be attempted 3 times before setting the station as offline
+        done = False #loop break condition
+        if not theTest is None and theTest.testNum > 0 and theTest.testNum <= 247 and self.ser.is_open: #If test exists, has a valid slave ID, and serial port is connected
+            while not done:
+                try:
+                    success, contStatus = self.__checkControls(theTest.testNum)
+
+                    if success: #ensure that request was successful
+                        theTest.setControlStatus(contStatus)
+                        done = True #exit upon success
+                    else: 
+                        retryCount += 1
+                except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
+                    self.close()
+                    global tests
+                    for oo in tests:
+                        oo.setOffline()
+                    done = True #exit upon error
+                if retryCount >= 3: #If the same test has been polled three times, with no response or bad responses, set the test as offline and continue
+                    theTest.setOffline()
+                    done = True #exit upon 3 unsuccessful retries
+
     #retrieveControlStatus, accepts a MODBUS slave ID to poll
     #composes and sends a MODBUS command which will instruct the PLC to return its control coils C101-132
     #reads the returned message and decodes to retrieve data
     #returns a 2-tuple containing a boolean and an array containing the new data
     #returns true is the data message is acceptable, returns false if it detects an error or an empty message
-    def _retrieveControlStatus(self, slID):
+    def __checkControls(self, slID):
         msg = [
             slID, #slave ID
             0x01, #MODBUS Command (Read Coil Status)
@@ -2168,13 +2194,52 @@ class Polling:
             
         return True, dataVals
 
+    def retrieveStatus(self, theTest):
+        if not self.ser.is_open:
+            messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
+        else:
+            self.q.put(lambda self=self, theTest = theTest: self._retrieveStatus(theTest))
+            self.q.join()
+
+    #_retrieveStatus, private method that will update the given test's status based on the results of __checkIfPaused and __checkIfRunning
+    def _retrieveStatus(self, theTest):
+        retryCount = 0 #set retry count to 0, communication will be attempted 3 times before setting the station as offline
+        done = False #loop break condition
+        if not theTest is None and theTest.testNum > 0 and theTest.testNum <= 247 and self.ser.is_open: #If test exists, has a valid slave ID, and serial port is connected
+            while not done:
+                try:
+                    pSuccess, isPaused = self.__checkIfPaused(theTest.testNum)
+                    rSuccess, isRunning = self.__checkIfRunning(theTest.testNum)
+
+                    if pSuccess and rSuccess: #ensure that all requests were successful
+                        #update test status based on results
+                        if not isRunning:
+                            theTest.setStopped()
+                        elif isPaused:
+                            theTest.setPaused()
+                        else:
+                            theTest.setNormal()
+                        done = True #exit upon success
+                    else: 
+                        retryCount += 1
+                except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
+                    self.close()
+                    global tests
+                    for oo in tests:
+                        oo.setOffline()
+                    done = True #exit upon error
+                if retryCount >= 3: #If the same test has been polled three times, with no response or bad responses, set the test as offline and continue
+
+                    theTest.setOffline()
+                    done = True #exit upon 3 unsuccessful retries
+
     #checkIfPaused(), accepts a MODBUS slave ID to poll.
     #composes a MODBUS command which will instruct the PLC to return the state of it's C50 register.
     #then parses the returned message, returning a 2-tuple
     #first value will return True if the response is acceptable, returns False if it detects an erroneous or empty message
     #second value returns True if the PLC is paused, False if not Paused, None otherwise
     #may raise SerialException
-    def _checkIfPaused(self, slID):
+    def __checkIfPaused(self, slID):
         msg = [
             slID, #slave ID
             0x01, #MODBUS Command (Read Coil Status)
@@ -2228,7 +2293,7 @@ class Polling:
     #first value will return True if the response is acceptable, returns False if it detects an erroneous or empty message
     #second value returns True if the PLC is in run mode, False if in stop mode, None otherwise
     #may raise SerialException
-    def _checkIfRunning(self, slID):
+    def __checkIfRunning(self, slID):
         msg = [
             slID, #slave ID
             0x02, #MODBUS Command (Read Input Status)
@@ -2276,125 +2341,57 @@ class Polling:
             #print("Error, value received was neither true or false, received "+hex(b[3]))
             return False, None
 
-    def upkeep(self):
-        if self.ser.is_open:
-            self.q.put(lambda self=self: self._upkeep())
-            self.q.join()
-
-    def _upkeep(self):
-        if self.ser.is_open: #If connected to a serial port 
-            if self.currTestPoll < len(tests) and tests[self.currTestPoll].testNum > 0 and tests[self.currTestPoll].testNum <= 247:
-                #ensure that the index is not out of bounds, which could possibly be caused by deleting tests, and check if test is associated with a valid slave ID before retrieving
-                try:
-                    retSuccess, newData = self.retrieve(tests[self.currTestPoll].testNum) #send requests
-                    pauseSuccess, isPaused = self.checkIfPaused(tests[self.currTestPoll].testNum)
-                    runSuccess, isRunning = self.checkIfRunning(tests[self.currTestPoll].testNum)
-                    contSuccess, contStatus = self.retrieveControlStatus(tests[self.currTestPoll].testNum)
-
-                    if retSuccess and pauseSuccess and runSuccess and contSuccess: #ensure that all requests were successful
-                        #update test status based on results
-                        if not isRunning:
-                            tests[self.currTestPoll].setStopped()
-                        elif isPaused:
-                            tests[self.currTestPoll].setPaused()
-                        else:
-                            tests[self.currTestPoll].setNormal()
-                            
-                        tests[self.currTestPoll].set(newData)
-                        tests[self.currTestPoll].setControlStatus(contStatus)
-                        self.currTestPoll += 1 #Increment to next test in list
-                        self.retryCount = 0 #Reset retry counter
-                    else: 
-                        self.retryCount += 1
-                except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
-                    self.close()
-                    for oo in tests:
-                        oo.setOffline()
-                    #messagebox.showerror("Power Tools Test Manager", "Serial Port Disconnected", parent=root.focus_get()) #this makes a call to tkinter from another thread, which will crash the program
-            if self.retryCount >= 3: #If the same test has been polled three times, with no response or bad responses, set the test as offline and continue
-                if self.currTestPoll < len(tests):
-                    tests[self.currTestPoll].setOffline()
-                self.currTestPoll += 1
-                self.retryCount = 0
-            if self.currTestPoll >= len(tests): #reset poll index to zero
-                self.currTestPoll = 0
-        self.q.task_done()
-
     #main loop for receiving checking up and receiving from PLCs and continuing the GUI
     def mainloop(self):
         global tests
+        self.running = True
+        currentTestIndex = 0 #Index in tests of the next station to be polled during regular polling
         #if the loop encounters an error while parsing three times in a row, it will mark the test as offline and proceed to poll the next test
-        while(self.running): #root.state() == 'normal'):
-            if not self.q.empty():
-                self.q.get()() #perform the queued function
-                self.q.task_done() #indicate that the enqueued task has been executed
+        while(self.running): 
+            while not self.q.empty():
+                job = self.q.get_nowait()
+                job() #perform the queued function
+                self.q.task_done() #flag that the queued task has finished to release other blocking threads
             else:
-                if self.ser.is_open: #If connected to a serial port 
-                    if self.currTestPoll < len(tests) and tests[self.currTestPoll].testNum > 0 and tests[self.currTestPoll].testNum <= 247:
-                        #ensure that the index is not out of bounds, which could possibly be caused by deleting tests, and check if test is associated with a valid slave ID before retrieving
-                        try:
-                            retSuccess, newData = self.retrieve(tests[self.currTestPoll].testNum) #send requests
-                            pauseSuccess, isPaused = self.checkIfPaused(tests[self.currTestPoll].testNum)
-                            runSuccess, isRunning = self.checkIfRunning(tests[self.currTestPoll].testNum)
-                            contSuccess, contStatus = self.retrieveControlStatus(tests[self.currTestPoll].testNum)
-
-                            if retSuccess and pauseSuccess and runSuccess and contSuccess: #ensure that all requests were successful
-                                #update test status based on results
-                                if not isRunning:
-                                    tests[self.currTestPoll].setStopped()
-                                elif isPaused:
-                                    tests[self.currTestPoll].setPaused()
-                                else:
-                                    tests[self.currTestPoll].setNormal()
-                                    
-                                tests[self.currTestPoll].set(newData)
-                                tests[self.currTestPoll].setControlStatus(contStatus)
-                                self.currTestPoll += 1 #Increment to next test in list
-                                self.retryCount = 0 #Reset retry counter
-                            else: 
-                                self.retryCount += 1
-                        except serial.serialutil.SerialException: #handle case where serial port is unexpectedly disconnected during communication
-                            self.ser.close()
-                            self.currTestPoll = 0
-                            self.retryCount = 0
-                            for oo in tests:
-                                oo.setOffline()
-                            #messagebox.showerror("Power Tools Test Manager", "Serial Port Disconnected", parent=root.focus_get()) #this makes a call to tkinter from another thread, which will crash the program
-                    if self.retryCount >= 3: #If the same test has been polled three times, with no response or bad responses, set the test as offline and continue
-                        if self.currTestPoll < len(tests):
-                            tests[self.currTestPoll].setOffline()
-                        self.currTestPoll += 1
-                        self.retryCount = 0
-                    if self.currTestPoll >= len(tests): #reset poll index to zero
-                        self.currTestPoll = 0
+                if self.ser.is_open and len(tests) > 0:
+                    if currentTestIndex >= len(tests):
+                        currentTestIndex = 0
+                    #enqueue regular polling tasks
+                    self.q.put(lambda self=self, theTest=tests[currentTestIndex]: self._retrieveStatus(theTest))
+                    self.q.put(lambda self=self, theTest=tests[currentTestIndex]: self._retrieveData(theTest))
+                    self.q.put(lambda self=self, theTest=tests[currentTestIndex]: self._retrieveControls(theTest))
+                    sleep(serTimeout)
+                    currentTestIndex += 1
 
     #thread control queueables
+    #newPort is an int
     def change_port(self, newPort):
         self.q.put(lambda self=self, newPort=newPort: self._change_port(newPort))
         self.q.join()
 
     def _change_port(self, newPort):
         try:
-            self.ser.port = 'COM%s' % (conf["port"])
+            print('COM%s' % newPort)
+            self.ser.port = 'COM%s' % newPort
         except serial.serialutil.SerialException:
             self.ser.close()
-        self.q.task_done()
 
     def open(self):
+        print("test2")
         if not self.ser.is_open:
+            print("test3")
             self.q.put(lambda self=self: self._open())
             self.q.join()
-            self.currTestPoll = 0
-            self.retryCount = 0
 
     def _open(self):
+        print("test6")
         if not self.ser.is_open:
             try:
+                print("test5")
                 self.ser.open()
-            except serial.serialutil.SerialException:
+            except serial.serialutil.SerialException as e:
+                print(e)
                 self.ser.close()
-        self.q.task_done()
-
 
     def close(self):
         if self.ser.is_open:
@@ -2406,10 +2403,8 @@ class Polling:
             self.ser.close()
         for oo in tests:
             oo.setOffline()
-        self.q.task_done()
 
-
-    #destructor that will end the main loop
+    #destructor that will end the main loop.  Free to be called from anywhere in the program
     def destroy(self):
         self.close()
         self.running = False
@@ -2515,10 +2510,10 @@ if __name__ == "__main__":
     except Exception as e:
         messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
 
+    poll = Polling(ser_port)
+
     #draw screen for the first time
     update()
-
-    poll = Polling(ser_port)
 
     #list of all threads
     threads = []

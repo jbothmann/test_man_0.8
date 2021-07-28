@@ -136,7 +136,7 @@ class Test:
         #draw control button
         self.button2.grid(row=5)
 
-        self.periodicCall() #Do first call and update to 
+        self.periodicCall() #Do first call and update to #TODO document
     
        
     #Test.draw, draws the information to the screen based on internal info

@@ -17,6 +17,10 @@ Install pySerial:
 	url: https://pythonhosted.org/pyserial/
 	pip command: $ pip install pyserial
 
-Install Requests
+Install Requests:
 	url: https://docs.python-requests.org/en/master/
 	pip command: $ python -m pip install requests
+
+Install pyInstaller:
+	url: https://pyinstaller.readthedocs.io/en/stable/index.html
+	pip command: $ pip install pyinstaller

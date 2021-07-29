@@ -29,16 +29,10 @@ numberOfControls = 32
 #base64 encoded bytestring which contains the favicon
 encoded_string = b'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAASQSURBVHhe7ZpdbBRVFMf/K61AgFKxfegmoA9SC0E0JGCIBqg0giH6Ag+KL2BEjU3E+PEkbJAHNDHVaAL4EYUH06A+iAFMSSG8WROFAm2wHyDGpppAhLZJW+luOZ7LnAnb7el054tpnPml/5x77+69e8+ZO/djpikC+C++3CU2tiQBEBtbkgCIjS1JAMTGliQAYmNLEgCxsSUJgNjYcmdOg6WlwPp1wIYNQHU1h32afMA/ffOmpBmTtntDJp3XtdFRSTCm3P7M2MI2bG61l/e9N94EenqsvI00FZ7q1hJ1dhCN5qLV0SNq/8IdAS+9COzdx1c84jstmwWWLQMu/CYFtwmvZ2tWTw3nDQcPqM4bwhkBd/M939oK1NRIQYQMDAAPcj+uXJGCsYRzebZtmxrOGxoaJnTeEPwImDcP6OywbNT09loXYmhYCsYT/AjI7Jgazht2vOPovCHYEWDW+PPnrHXfiWPHLOVyUhAQ5eXAqlW851gPtJ0Hlj/K3k3inglAYPrhe30NzlfbOaLp0/X6QenhpUQrV+qfFSi4ADxRqzucr6FBq3Na/YgUTABKSohaz+hO5+v17Xr9CBVMALZu0R3OVy5LVD5Xrx+h/E+Cs2cDHReAqrQUOGAOIqd/9Tn5cXd7/wb27we6L0qZD+xIeFZmp37Fw9ZAnzXvaH1yIX8jIF3FV583PbNmScEdpu868AgfcgqPuC7wtxHavTs65w3l9wA7eePlA+8jIM33/B+XgWn2w42IuNjNh51FknGP9xGwaWP0zhsGByXhDe8BqF0jCY+Yjh89AjQ28ra1beyjLDc0HpKER8wt4EktP+mzczH67luiysqx7VUvJPrqS6KRG3odTd1dvrfV3gOw7kmi69f0jjmp4QOiVEpv0+jxx4h6/tTrFuqZp/U2XMjfMjhnDrBiBW+GilwJRrJAU5P10zZVvJS+8jJw6hTQ0gLcGAGWPmQ9UXKiuZlPfU9Jxgd2JCJRaSnR6V9uX9E+HlHfHCLalRl7pQs1PES0qEZv06WiDcBzz+oOTqaPPtTb86BwngkWS12dJFxw9Sqw613J+Ke4ACxZAiyYL5kAqbhXEi7IZID+fsn4Z/JJ0Gx2fubJafFiYN9e3vt3WuWjsm7fGkgOa7h5DWbW+JMn+BT3lxQK9fXAJx9LpgjOngWW86Trdc+gYd8LE+r5zfp96FYD/USb+Z7Pb9ssh5s2EjX9SPTvsF7PVm7EWiLz6wcg5wDMmEF0+ZLeIa96/z1r9i/8rYoKou2vEWXZUa1e49fj6wQg5wC8/ZbeGb9qbyN6YSvRgvlEM2cSzS0jquWzffNx/fvX/iFKp/U++tTEc0BlBdDVBZSVSUFImNfe5v1hKiUFCvWvAp9+LplgmXgVMC8VwnbeYCZZJ+fNgemzLyQTPPoIWPgA0N4OlJRIQUSYU+JqPnUGuOwVoo+APXuid/4EL5treaMUovOG8SPg/vuAAwedh2VYmH9k+P0ScPgwH5qOW9NUyPg7Df4PiPYsMAVIAiA2tiQBEBtbkgCIjS1JAMTGliQAYmNLEgCxMQX4DxvJZiayMybCAAAAAElFTkSuQmCC'
 
-#draw the main viewer
-root = Tk()
-favicon = PhotoImage(data=encoded_string)
-root.iconphoto(True, favicon) #sets the favicon for root and all toplevel()
-root.title('Power Tools Test Manager')
-running = True
+
 
 #procedure to be taken when attempting to exit the program, which will prompt a save
 def exitProgram():
-    global running
     response = messagebox.askyesnocancel("Power Tools Test Manager", "Save before closing Test Manager?", parent=root.focus_get())
     if not response is None:
         if response:
@@ -46,22 +40,8 @@ def exitProgram():
         root.destroy()
         poll.destroy()
 
-root.protocol('WM_DELETE_WINDOW', exitProgram) #Override close button with exitProgram
 
-#keep track of if the software is locked, if it is locked by password, and the password itself
-locked = False
-passlocked = False
-password = ""
 
-#create an empty list, to be filled with user-specified Theme objects from the themes.json config file.  Population occurs in startup configuration phase
-themes = []
-#create an empty list, to be filled with user-specified fonts from the fonts.json config file.  Population occurs in startup configuration phase
-families = []
-#create an empty list, to be filled with user-specified text sizes from the fonts.json config file.  Population occurs in startup configuration phase
-sizes = []
-
-#create a ThemeAndFont object, which we will use to paint our program
-T = tkTheme.ThemeAndFont()
 
 #class Test, holds all information about one test
 class Test:
@@ -212,7 +192,7 @@ class Test:
         self.button1.grid(row=4, pady=2)
         self.button2.grid(row=5)
 
-        self.periodicCall()
+        self.periodicCall() #begin periodic updating
     
        
     #Test.draw, draws the information to the screen based on internal info
@@ -244,11 +224,11 @@ class Test:
         self.dataLabel.config(text=self.toString())
         if self.status == Test.NORMAL:
             self.statusIndicator.config(text="\U00002B24   In Progress", fg="green")
-            self.button1.config(text="Pause", command=lambda poll=poll, slID = self.testNum: poll.pause(slID), state=NORMAL)
+            self.button1.config(text="Pause", command=lambda poll=poll, theTest=self: poll.pause(theTest), state=NORMAL)
             self.button2.config(text="More Controls", command=lambda: openControls(self.testNum), state=NORMAL)
         elif self.status == Test.PAUSED:
             self.statusIndicator.config(text="\U00002B24   Paused", fg=T.theme.fg)
-            self.button1.config(text="Resume", command=lambda poll=poll, slID = self.testNum: poll.resume(slID), state=NORMAL)
+            self.button1.config(text="Resume", command=lambda poll=poll, theTest=self: poll.resume(theTest), state=NORMAL)
             self.button2.config(text="More Controls", command=lambda: openControls(self.testNum), state=NORMAL)
         elif self.status == Test.STOPPED:
             self.statusIndicator.config(text="\U00002B24   Stopped", fg="orange")
@@ -274,7 +254,8 @@ class Test:
         root.update_idletasks()
         root.minsize(width=max(root.winfo_reqwidth(),400), height=max(root.winfo_reqheight(),300))
 
-    def periodicCall(self): #TODO: document
+    #This method calls itself periodically to update the contents of the main station display widget
+    def periodicCall(self): 
         if self.showTest == True:
             self.updateLabel()
         root.after(1000, self.periodicCall) #schedule next call, in ms
@@ -338,10 +319,7 @@ class Test:
             if isinstance(newStatus[ii], bool):
                 self.controls[ii][1] = newStatus[ii]
             
-#list which holds the array of tests, currently begins empty
-tests = []
-#Dictionary which will be used to link address to index in tests[]
-testIndexDict = {}
+
 
 
 #Default named values when creating a new test using the gui dialog #TODO: is this needed?
@@ -447,7 +425,7 @@ def connect(): #TODO: test com connection more thoroughly ?
 
     COMframe = T(LabelFrame(tl, text="COM Ports", padx=5, pady=5, relief=RIDGE))
 
-    APIframe = T(LabelFrame(tl, text="COM Ports", padx=5, pady=5, relief=RIDGE))
+    APIframe = T(LabelFrame(tl, text="API Server", padx=5, pady=5, relief=RIDGE))
 
     #Add ports to dropdown menu, refresh interactable widgets
     def getCOMs():
@@ -482,7 +460,6 @@ def connect(): #TODO: test com connection more thoroughly ?
     #connects the program to the chosen COM port
     def connectCOM():
         nonlocal currentPortSelection
-        print("test1")
         if currentPortSelection > 0 and currentPortSelection <= 256:
             poll.change_port(currentPortSelection)
             poll.open()
@@ -1440,7 +1417,7 @@ def openControls(InitialTestNum=0):
 
     
     def sendCommand(controlIndex, value):
-        control(tests[currentTestIndex].testNum, controlIndex, value)
+        poll.control(tests[currentTestIndex], controlIndex, value)
         update(currentTestIndex)
 
 
@@ -1448,25 +1425,13 @@ def openControls(InitialTestNum=0):
 
     #update() is called whenever a new selection is made on the dropdown menu.  It reconfigures the window to reflect what was chosen.
     #if update() is passed an invalid index, then it will show a default selection
-    def update(testIndex): #TODO: fix
+    def update(testIndex): #TODO: test
         nonlocal currentTestIndex
         currentTestIndex=testIndex
         if (currentTestIndex>=0): 
             dropdown.config(text=("Station "+str(tests[testIndex].testNum)+": "+tests[testIndex].name+" \U000025BC"))
 
-            retryCount = 0
-            done = False
-            while not done:  #If the data retrieval is unsuccessful, Try three times before showing that the PLC is offline
-                retSuccess, newControlStatus = retrieveControlStatus(tests[currentTestIndex].testNum)
-                if retSuccess:  #The data retrieval has been successful.  Exit the loop and populate controls with current data
-                    done = True
-                    tests[currentTestIndex].setControlStatus(newControlStatus)
-                else:
-                    retryCount += 1 #try again
-
-                if retryCount >= 3:  #The data retrieval has been unsuccessful three times.  Exit the loop and show controls offline
-                    done = True
-                    tests[currentTestIndex].setOffline()
+            poll.retrieveControls(tests[currentTestIndex])
 
             for ii in range(numberOfControls):
                 controlNameLabels[ii].config(text=tests[currentTestIndex].controls[ii][0])
@@ -1685,82 +1650,68 @@ def theme():
     tl.update_idletasks()
     tl.minsize(width=max(tl.winfo_reqwidth(),300), height=max(tl.winfo_reqheight(),200))
 
-#serial command aliases for Polling object, temp
-def pause(slID):
-    poll.pause(slID)
+#build window, called at the beginning of program execution to populate the root window's basic structure
+def buildWindow():
+    #declaring dataFrame, which will hold all test widgets
+    global dataFrame
+    dataFrame = LabelFrame(root, bd=0)
+    dataFrame.pack(side=TOP)
 
-def resume(slID):
-    poll.resume(slID)
+    #Version label in the far right, on a window-spanning relief bar
+    global ver, verText
+    ver = Frame(root, bd=1, relief=SUNKEN)
+    verText = Label(ver, text="version " + version)
+    verText.pack(side=RIGHT)
+    ver.pack(side=BOTTOM, fill='x')
 
-def control(slID, controlIndex, value):
-    poll.control(slID, controlIndex, value)
+    #small control panel located at the bottom-center of the window
+    global botControl
+    botControl = Frame(root, bd=0)
+    botControl.pack(side=BOTTOM, pady=2)
 
-def pauseAll():
-    poll.pauseAll()
+    #Create two buttons, located at the bottom of the screen, that can control the status of all stations at once
+    global pauseAllButton, resumeAllButton
+    pauseAllButton = Button(botControl, text="Pause All Tests", command=lambda poll=poll: poll.pauseAll())
+    pauseAllButton.grid(row=0, column=0)
+    resumeAllButton = Button(botControl, text="Resume All Tests", command=lambda poll=poll: poll.resumeAll())
+    resumeAllButton.grid(row=0, column=1)
 
-def resumeAll():
-    poll.resumeAll()
+    #build the windows-style menubar with multiple cascades #TODO: weird line?? Fonts not working on menubar??? NOTE: this is probably unfixable
+    global menubar, fileMenu, functionsMenu, viewMenu, lockSubMenu, controlsMenu
+    menubar = Menu(root)
 
-#build window block
+    fileMenu = Menu(menubar, tearoff=0)
+    fileMenu.add_command(label="Save Session", command=saveSession)
+    fileMenu.add_command(label="Open Session", command=openSession)
+    fileMenu.add_command(label="Connections", command=connect)
+    fileMenu.add_command(label="Write to File", command=writeToFile)
+    fileMenu.add_command(label="Exit", command=exitProgram)
+    menubar.add_cascade(label="File", menu=fileMenu)
 
-#declaring dataFrame, which will hold all test widgets
-dataFrame = LabelFrame(root, bd=0)
-dataFrame.pack(side=TOP)
+    functionsMenu = Menu(menubar, tearoff=0)
+    functionsMenu.add_command(label="Edit Stations", command=editTests)
+    functionsMenu.add_command(label="Add Station", command=addTest)
+    functionsMenu.add_command(label="Delete Station", command=deleteTest)
+    functionsMenu.add_command(label="Label Controls", command=editControls)
+    menubar.add_cascade(label="Edit", menu=functionsMenu)
 
-#Version label in the far right, on a window-spanning relief bar
-ver = Frame(root, bd=1, relief=SUNKEN)
-verText = Label(ver, text="version " + version)
-verText.pack(side=RIGHT)
-ver.pack(side=BOTTOM, fill='x')
+    viewMenu = Menu(menubar, tearoff=0)
+    viewMenu.add_command(label="Hide/Show Stations", command=changeView)
+    viewMenu.add_command(label="Theme", command=theme)
 
-botControl = Frame(root, bd=0)
-botControl.pack(side=BOTTOM, pady=2)
+    lockSubMenu = Menu(viewMenu, tearoff=0)
+    lockSubMenu.add_command(label="Password Lock", command=lockDisplayWithPass)
+    lockSubMenu.add_command(label="No Password Lock", command=lockDisplay)
+    viewMenu.add_cascade(label="Lock Display", menu=lockSubMenu)
 
-pauseAllButton = Button(botControl, text="Pause All Tests", command=pauseAll)
-pauseAllButton.grid(row=0, column=0)
-resumeAllButton = Button(botControl, text="Resume All Tests", command=resumeAll)
-resumeAllButton.grid(row=0, column=1)
+    menubar.add_cascade(label="View", menu=viewMenu)
 
-#build the windows-style menubar with multiple cascades #TODO: weird line?? Fonts not working???
-menubar = Menu(root)
+    controlsMenu = Menu(menubar, tearoff=0)
+    controlsMenu.add_command(label="Pause/Resume", command=pauseTests)
+    controlsMenu.add_command(label="More Controls", command=openControls)
+    menubar.add_cascade(label="Control", menu=controlsMenu)
 
-fileMenu = Menu(menubar, tearoff=0)
-fileMenu.add_command(label="Save Session", command=saveSession)
-fileMenu.add_command(label="Open Session", command=openSession)
-fileMenu.add_command(label="Connections", command=connect)
-fileMenu.add_command(label="Write to File", command=writeToFile)
-fileMenu.add_command(label="Exit", command=exitProgram)
-menubar.add_cascade(label="File", menu=fileMenu)
-
-functionsMenu = Menu(menubar, tearoff=0)
-functionsMenu.add_command(label="Edit Stations", command=editTests)
-functionsMenu.add_command(label="Add Station", command=addTest)
-functionsMenu.add_command(label="Delete Station", command=deleteTest)
-functionsMenu.add_command(label="Label Controls", command=editControls)
-menubar.add_cascade(label="Edit", menu=functionsMenu)
-
-viewMenu = Menu(menubar, tearoff=0)
-viewMenu.add_command(label="Hide/Show Stations", command=changeView)
-viewMenu.add_command(label="Theme", command=theme)
-
-lockSubMenu = Menu(viewMenu, tearoff=0)
-lockSubMenu.add_command(label="Password Lock", command=lockDisplayWithPass)
-lockSubMenu.add_command(label="No Password Lock", command=lockDisplay)
-viewMenu.add_cascade(label="Lock Display", menu=lockSubMenu)
-
-menubar.add_cascade(label="View", menu=viewMenu)
-
-controlsMenu = Menu(menubar, tearoff=0)
-controlsMenu.add_command(label="Pause/Resume", command=pauseTests)
-controlsMenu.add_command(label="More Controls", command=openControls)
-menubar.add_cascade(label="Control", menu=controlsMenu)
-
-# testCommentsMenu = Menu(menubar, tearoff=0)
-# testCommentsMenu.add_command(label="Add a Comment", command=addComment)
-# testCommentsMenu.add_command(label="View Comments", command=viewComments)
-# menubar.add_cascade(label="Test Comments", menu=testCommentsMenu)
-
-root.config(menu=menubar)
+    root.config(menu=menubar)
 
 #Draws the screen with the current parameters
 def update():
@@ -1849,7 +1800,7 @@ def update():
 
 #API hosting block
 
-#TODO: revert?
+#TODO: implement
 class Server:
     def init(self, port=5000):
         self.api = flask.Flask(__name__, instance_relative_config=True)
@@ -1900,7 +1851,13 @@ class Server:
 
 #TODO: find a way to host the api without interrupting the rest of the program
 
-#PLC station polling object #TODO: test
+#PLC station polling object
+#This object is used to control and execute all operations related to polling the serial network of PLCs.
+#It is designed to be run in a separate thread, with mainloop() as the target.
+#public methods are designed to be called from outside the thread running mainloop()
+#most public methods automatically queue up operations to be executed within the mainloop().  They also automatically block until the the queue of operations is empty.
+#private methods, with preceding underscores, are meant to be run from inside the mainloop().  They should not be called from outside.
+#the loop is terminated by the destroy() method
 class Polling:
     def __init__(self, port=None):
         #initialize serial connection configuration, without selecting a port.  ser will not open until ser.open() is called
@@ -1911,7 +1868,8 @@ class Polling:
         #queue for enqueueing functions to be run in the mainloop
         self.q = queue.Queue()
 
-    #when given a binary message as a list of ints, returns a 16 bit MODBUS CRC as a list of ints.  Static helper function
+    #Static helper Function getCRC()
+    #when given a binary message as a list of ints, returns a 16 bit MODBUS Circular Redundancy Check as a list of ints.
     def getCRC(msg):
         CRC = 0xFFFF
         
@@ -1927,6 +1885,7 @@ class Polling:
 
     #station control functions block
 
+    #pass a test object to enqueue a pause command to be sent to the associated PLC slave address
     def pause(self, theTest):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
@@ -1934,6 +1893,7 @@ class Polling:
             self.q.put(lambda self = self, slID = theTest.testNum: self._pause(slID))
             self.q.join()
 
+    #private method enqueued by pause()
     def _pause(self, slID):
         if self.ser.is_open:
             msg = [
@@ -1949,6 +1909,7 @@ class Polling:
             sleep(serTimeout)
             self.ser.reset_input_buffer()
 
+    #pass a test object to enqueue an unpause command to be sent to the associated PLC slave address
     def resume(self, theTest):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
@@ -1956,6 +1917,7 @@ class Polling:
             self.q.put(lambda self=self, slID=theTest.testNum: self._resume(slID))
             self.q.join()
 
+    #private method enqueued by resume()
     def _resume(self, slID):
         if self.ser.is_open:
             msg = [
@@ -1971,6 +1933,8 @@ class Polling:
             sleep(serTimeout)
             self.ser.reset_input_buffer()
 
+    #pass a test object to enqueue a command to be sent to the associated PLC slave address
+    #The passed boolean value will be assigned to the passed integer control index from 1-32
     def control(self, theTest, controlIndex, value):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
@@ -1978,6 +1942,7 @@ class Polling:
             self.q.put(lambda self=self, slID=theTest.testNum, controlIndex=controlIndex, value=value: self._control(slID, controlIndex, value))
             self.q.join()
 
+    #private method enqueued by control()
     def _control(self, slID, controlIndex, value):
         if self.ser.is_open:
             msg = [
@@ -1993,6 +1958,7 @@ class Polling:
             sleep(serTimeout)
             self.ser.reset_input_buffer()
 
+    #enqueue a broadcast pause command to be sent to all PLCs on the network
     def pauseAll(self):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
@@ -2000,6 +1966,7 @@ class Polling:
             self.q.put(lambda self=self: self._pauseAll())
             self.q.join()
 
+    #private method enqueued by pauseAll()
     def _pauseAll(self):
         if self.ser.is_open:
             msg = [
@@ -2010,11 +1977,12 @@ class Polling:
                 0xFF, #set ON
                 0x00
             ]
-            msg = msg + getCRC(msg) #append CRC
+            msg = msg + Polling.getCRC(msg) #append CRC
             self.ser.write(bytes(msg))
             sleep(serTimeout)
             self.ser.reset_input_buffer()
 
+    #enqueue a broadcast unpause command to be sent to all PLCs on the network
     def resumeAll(self):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
@@ -2022,6 +1990,7 @@ class Polling:
             self.q.put(lambda self=self: self._resumeAll())
             self.q.join()
 
+    #private method enqueued by resumeAll()
     def _resumeAll(self):
         if self.ser.is_open:
             msg = [
@@ -2037,6 +2006,7 @@ class Polling:
             sleep(serTimeout)
             self.ser.reset_input_buffer()
 
+    #enque a request for a range of relevant floating point data values from the PLC associated with the passed Test object
     def retrieveData(self, theTest):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
@@ -2045,6 +2015,7 @@ class Polling:
             self.q.join()
 
     #_retrieveData, private method that will update the given test's data based on the results of __checkData
+    #method enqueued by retrieveData()
     def _retrieveData(self, theTest):
         retryCount = 0 #set retry count to 0, communication will be attempted 3 times before setting the station as offline
         done = False #loop break condition
@@ -2116,6 +2087,7 @@ class Polling:
             
         return True, dataVals
 
+    #enque a request for a range of relevant control coil boolean values from the PLC associated with the passed Test object
     def retrieveControls(self, theTest):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
@@ -2124,6 +2096,7 @@ class Polling:
             self.q.join()
 
     #_retrieveControls, private method that will update the given test's controls based on the results of __checkControls()
+    #method enqueud by retrieveControls()
     def _retrieveControls(self, theTest):
         retryCount = 0 #set retry count to 0, communication will be attempted 3 times before setting the station as offline
         done = False #loop break condition
@@ -2194,6 +2167,7 @@ class Polling:
             
         return True, dataVals
 
+    #enque a request for the state of the PLC associated with the passed Test object
     def retrieveStatus(self, theTest):
         if not self.ser.is_open:
             messagebox.showerror("Power Tools Test Manager", "Not connected to a serial port", parent=root.focus_get())
@@ -2202,6 +2176,7 @@ class Polling:
             self.q.join()
 
     #_retrieveStatus, private method that will update the given test's status based on the results of __checkIfPaused and __checkIfRunning
+    #method enqueued by retrieveStatus()
     def _retrieveStatus(self, theTest):
         retryCount = 0 #set retry count to 0, communication will be attempted 3 times before setting the station as offline
         done = False #loop break condition
@@ -2341,7 +2316,7 @@ class Polling:
             #print("Error, value received was neither true or false, received "+hex(b[3]))
             return False, None
 
-    #main loop for receiving checking up and receiving from PLCs and continuing the GUI
+    #main loop for receiving checking up and receiving from PLCs and continuing the GUI #TODO: application crashes when serial connection is physically terminated during runtime
     def mainloop(self):
         global tests
         self.running = True
@@ -2353,6 +2328,7 @@ class Polling:
                 job() #perform the queued function
                 self.q.task_done() #flag that the queued task has finished to release other blocking threads
             else:
+                sleep(serTimeout) #sleeping here for a beat gives joined threads the time to release blocking
                 if self.ser.is_open and len(tests) > 0:
                     if currentTestIndex >= len(tests):
                         currentTestIndex = 0
@@ -2360,44 +2336,41 @@ class Polling:
                     self.q.put(lambda self=self, theTest=tests[currentTestIndex]: self._retrieveStatus(theTest))
                     self.q.put(lambda self=self, theTest=tests[currentTestIndex]: self._retrieveData(theTest))
                     self.q.put(lambda self=self, theTest=tests[currentTestIndex]: self._retrieveControls(theTest))
-                    sleep(serTimeout)
                     currentTestIndex += 1
 
-    #thread control queueables
-    #newPort is an int
+    #pass an int to enqueue a directive to change the COM port
     def change_port(self, newPort):
         self.q.put(lambda self=self, newPort=newPort: self._change_port(newPort))
         self.q.join()
 
+    #method enqueud by change_port()
     def _change_port(self, newPort):
         try:
-            print('COM%s' % newPort)
             self.ser.port = 'COM%s' % newPort
         except serial.serialutil.SerialException:
             self.ser.close()
 
+    #enqueue a directive to enable serial communication
     def open(self):
-        print("test2")
         if not self.ser.is_open:
-            print("test3")
             self.q.put(lambda self=self: self._open())
             self.q.join()
 
+    #method enqued by open()
     def _open(self):
-        print("test6")
         if not self.ser.is_open:
             try:
-                print("test5")
                 self.ser.open()
             except serial.serialutil.SerialException as e:
-                print(e)
                 self.ser.close()
 
+    #enqueue a directive to disable serial communucation
     def close(self):
         if self.ser.is_open:
             self.q.put(lambda self=self: self._close())
             self.q.join()
 
+    #method enqueued by close()
     def _close(self):
         if self.ser.is_open:
             self.ser.close()
@@ -2415,9 +2388,44 @@ class Polling:
 
 #main
 if __name__ == "__main__":
-    #startup configuration block
+    #draw the main viewer
+    root = Tk()
+    favicon = PhotoImage(data=encoded_string)
+    root.iconphoto(True, favicon) #sets the favicon for root and all toplevel()
+    root.title('Power Tools Test Manager')
+    root.protocol('WM_DELETE_WINDOW', exitProgram) #Override close button with exitProgram, defined above
 
-    ser_port = None
+    #keep track of if the software is locked, if it is locked by password, and the password itself
+    locked = False
+    passlocked = False
+    password = ""
+
+    #create an empty list, to be filled with user-specified Theme objects from the themes.json config file.  Population occurs in startup configuration phase
+    themes = []
+    #create an empty list, to be filled with user-specified fonts from the fonts.json config file.  Population occurs in startup configuration phase
+    families = []
+    #create an empty list, to be filled with user-specified text sizes from the fonts.json config file.  Population occurs in startup configuration phase
+    sizes = []
+
+    #create a ThemeAndFont object, which will be used use to paint the program
+    T = tkTheme.ThemeAndFont()
+    #list which holds the array of tests, currently begins empty
+    tests = []
+    #Dictionary which will be used to link address to index in tests[]
+    testIndexDict = {}
+
+    #Polling object, which controls and executes all operations related to polling the serial network
+    poll = Polling()
+    #list of all threads
+    threads = []
+    threads.append(threading.Thread(target=poll.mainloop))
+    for oo in threads:
+        oo.start()
+
+    #draw screen for the first time
+    buildWindow()
+
+    #startup configuration block
 
     #add all themes from themes configuration file
     try:
@@ -2467,7 +2475,8 @@ if __name__ == "__main__":
 
             if isinstance(conf["port"], int):
                 if conf["port"] > 0 and conf["port"] <= 256:
-                    ser_port = 'COM%s' % (conf["port"])
+                    poll.change_port(conf["port"])
+                    poll.open()
 
         #open one or more session files on startup.  "file" accepts a string filepath, or a list of string filepaths
         if "file" in conf:
@@ -2510,15 +2519,8 @@ if __name__ == "__main__":
     except Exception as e:
         messagebox.showerror("Power Tools Test Viewer", "Problem encountered while loading from config file", parent=root.focus_get())
 
-    poll = Polling(ser_port)
-
-    #draw screen for the first time
+    
+    #update the display for the first time
     update()
 
-    #list of all threads
-    threads = []
-    threads.append(threading.Thread(target=poll.mainloop))
-    for oo in threads:
-        oo.start()
-    root.mainloop()
-
+    root.mainloop() #Tkinter main thread

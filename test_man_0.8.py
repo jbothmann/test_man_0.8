@@ -6,6 +6,8 @@ from datetime import datetime
 from struct import *
 from time import sleep
 
+import ctypes
+import socket
 import flask
 import flask.json
 import serial
@@ -39,6 +41,7 @@ def exitProgram():
             saveSession()
         root.destroy()
         poll.destroy()
+        server.stop()
 
 
 
@@ -414,7 +417,7 @@ def parseJSONsession(s):
 
     return newTests
         
-def connect(): #TODO: test com connection more thoroughly ?
+def connect():
     #setup the new menu
     tl = T.apply(Toplevel())
     tl.title('Connect')
@@ -471,15 +474,28 @@ def connect(): #TODO: test com connection more thoroughly ?
         update()
         getCOMs()
 
-    def connectAPI(): #TODO: implement this
-        APIhint.config(text="Now serving on 0.0.0.0:%s" % APIportEntry.get())
-        connectAPIButton.config(state=DISABLED)
-        disconnectAPIButton.config(state=NORMAL)
+    #refresh widgets in the API section
+    def updateAPI_UI():
+        APIhint.config(text=server.toString())
+        if server.serving:
+            disconnectAPIButton.config(state=NORMAL)
+        else:
+            disconnectAPIButton.config(state=DISABLED)
+
+    def connectAPI():
+        port = APIportEntry.get()
+        if not port.isdigit():
+            messagebox.showerror("Power Tools Test Manager", "Please input a number", parent=root.focus_get())
+        elif int(port) < 0 or int(port) > 65536:
+            messagebox.showerror("Power Tools Test Manager", "Please input a number between 0 and 65536", parent=root.focus_get())
+        else:
+            server.setport(port)
+            server.start()
+        updateAPI_UI()
 
     def disconnectAPI():
-        APIhint.config(text="Not Serving")
-        connectAPIButton.config(state=NORMAL)
-        disconnectAPIButton.config(state=DISABLED)
+        server.stop()
+        updateAPI_UI()
 
     #Create interactable elements for COM port setup
 
@@ -512,6 +528,7 @@ def connect(): #TODO: test com connection more thoroughly ?
 
     #Entry for inputing the desired net port
     APIportEntry = T(Entry(APIframe, width=25))
+    APIportEntry.insert(0, str(server.port))
     APIportEntry.grid(row=0, column=0, padx=5, pady=5)
 
     #hint showing the status of the API connection
@@ -523,10 +540,12 @@ def connect(): #TODO: test com connection more thoroughly ?
     connectAPIButton.grid(row=0, column=1, padx=5, pady=5)
 
     #disconnect button
-    disconnectAPIButton = T(Button(APIframe, text='Disconnect', command = disconnectAPI))
+    disconnectAPIButton = T(Button(APIframe, text='Disconnect', command=disconnectAPI))
     disconnectAPIButton.grid(row=1, column=1, padx=5, pady=5)
 
     APIframe.pack(side=TOP, padx=5, pady=5)
+
+    updateAPI_UI() #update the API related widgets for the first time
 
     #close button
     T.apply(Button(tl, text='Close', command=tl.destroy)).pack(side=BOTTOM, padx=5, pady=5)
@@ -1425,7 +1444,7 @@ def openControls(InitialTestNum=0):
 
     #update() is called whenever a new selection is made on the dropdown menu.  It reconfigures the window to reflect what was chosen.
     #if update() is passed an invalid index, then it will show a default selection
-    def update(testIndex): #TODO: test
+    def update(testIndex): 
         nonlocal currentTestIndex
         currentTestIndex=testIndex
         if (currentTestIndex>=0): 
@@ -1524,7 +1543,7 @@ def pauseTests():
 
     #queries all test stations for their pause status and update controls to reflect
     def refresh():
-        for oo in tests: #TODO fix
+        for oo in tests: 
             poll.retrieveStatus(oo)
 
             if oo.status == Test.NORMAL:
@@ -1800,22 +1819,29 @@ def update():
 
 #API hosting block
 
-#TODO: implement
-class Server:
-    def init(self, port=5000):
-        self.api = flask.Flask(__name__, instance_relative_config=True)
-        self.api.config.from_mapping(SECRET_KEY='dev')
+#Server object
+#This object is used to control and execute operations related to hosting an API over the local network.
+#flask view functions are functions that are called by the flask instance.  Their return values are served to clients.  
+class Server():
+    def __init__(self):
+        self.api = flask.Flask(__name__, instance_relative_config=True) #flask instance
+        self.api.config.from_mapping(SECRET_KEY='dev') #TODO
+        #register flask view functions
         self.api.add_url_rule('/', 'manifest', self.manifest)
         self.api.add_url_rule('/index', 'index', self.index)
         self.api.add_url_rule('/station/<url>', 'serve station', self.serveStation)
 
-        self.q = queue.Queue()
+        self.port = 5000 #default ip port
 
-        self.running = False
+        self.serving = False #whether the server is running or not
 
+        self.t = None #placeholder reference to the thread object created in start()
+
+    #flask view function that clients can use to verify the server.
     def manifest(self):
         return flask.json.jsonify({'app': 'Power Tools Test Manager', 'version': version})
 
+    #flask view function that gives clients a list of all available stations
     def index(self):
         return flask.json.jsonify([{
             "url": oo.url,
@@ -1824,8 +1850,9 @@ class Server:
             "subtitle": oo.serial
             } for oo in tests])
 
+    #flask view function that gives clients all of the information on the indicated station
     def serveStation(self, url):
-        stationToServe = next([oo for oo in tests if oo.url == url], None)
+        stationToServe = next((oo for oo in tests if oo.url == url), None)
         if not stationToServe is None:
             return flask.json.jsonify({
                 "url": stationToServe.url,
@@ -1844,12 +1871,56 @@ class Server:
                     "data": oo[1]
                     }for oo in stationToServe.controls]
                 })
-        return
+        flask.abort(404)
 
+    #sets a new value for the ip port.
+    #If the server is already running, it will be briefly brought offline before being restarted
+    def setport(self, port=5000):
+        if self.serving:
+            self.stop()
+            self.port = port
+            self.start()
+        else:
+            self.port = port
+
+    #Creates a new thread which will run the API server
+    def start(self):
+        if not self.serving:
+            self.serving = True
+            self.t = threading.Thread(target=self.mainloop)
+            self.t.start()
+
+    #mainloop, the upkeep function to be run in another thread using start()
+    #this function contains an infinite loop, so don't call it from the main thread.
+    #The default flask run method is meant for development use, but it was the only way that I found that would let me start the server during python runtime
+    #If debug mode is turned on, clients can use it to run arbitrary code.  Don't let that happen.
     def mainloop(self):
-        pass
+        try:
+            self.api.run(host='0.0.0.0', port=self.port, debug=False)
+        finally:
+            pass
 
-#TODO: find a way to host the api without interrupting the rest of the program
+    #Send an exception to the api thread which will forcibly terminate the loop
+    #This is messy, and I don't totally know how it works, but flask doesn't offer a better way to shutdown a server from a python script
+    def stop(self):
+        if self.serving:
+            self.serving = False
+            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(self.t.native_id,
+                  ctypes.py_object(SystemExit))
+            if res > 1:
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
+                #Exception raise failure
+
+    #returns the status of the server as a string
+    def toString(self):
+        if self.serving:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("10.253.155.219", 58162)) #This address is arbitrary, and the connection is only used to enable socket.getsockname()
+                ip = s.getsockname()[0] #This returns the external ip address
+                return "Serving on http://%s:%s/" % (ip, self.port)
+        else: 
+            return "Not Serving"
+
 
 #PLC station polling object
 #This object is used to control and execute all operations related to polling the serial network of PLCs.
@@ -2422,6 +2493,8 @@ if __name__ == "__main__":
     for oo in threads:
         oo.start()
 
+    server=Server()
+
     #draw screen for the first time
     buildWindow()
 
@@ -2467,16 +2540,22 @@ if __name__ == "__main__":
         conf = json.load(open("config.json"))
 
         #connect to a COM port on startup.  "port" accepts a value between 1 and 256, in the form of an int or a string "COM<value>"
-        if "port" in conf:
-            if isinstance(conf["port"], str):
-                if len(conf["port"]) > 3:
-                    if conf["port"][:3] == "COM" and conf["port"][3:].isdigit():
-                        conf["port"] = int(conf["port"][3:])
+        if "comport" in conf:
+            if isinstance(conf["comport"], str):
+                if len(conf["comport"]) > 3:
+                    if conf["comport"][:3] == "COM" and conf["comport"][3:].isdigit():
+                        conf["comport"] = int(conf["comport"][3:])
 
-            if isinstance(conf["port"], int):
-                if conf["port"] > 0 and conf["port"] <= 256:
-                    poll.change_port(conf["port"])
+            if isinstance(conf["comport"], int):
+                if conf["comport"] > 0 and conf["comport"] <= 256:
+                    poll.change_port(conf["comport"])
                     poll.open()
+
+        if "netport" in conf:
+            if isinstance(conf["netport"], int):
+                if conf["netport"] >=0 and conf["netport"] <= 65536:
+                    server.setport(conf["netport"])
+                    server.start()
 
         #open one or more session files on startup.  "file" accepts a string filepath, or a list of string filepaths
         if "file" in conf:

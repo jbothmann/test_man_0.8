@@ -15,7 +15,7 @@ class Polling():
         self.api.add_url_rule('/shutdown', 'shutdown', self.shutdown)
 
     def mainloop(self):
-        self.api.run()
+        self.api.run(host='0.0.0.0')
 
     def shutdown_server(self):
         func = request.environ.get('werkzeug.server.shutdown')

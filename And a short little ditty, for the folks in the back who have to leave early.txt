@@ -1,6 +1,6 @@
 Notes for hosting a server, 7/23/2021
 Some sort of multitasking is required to run a server concurrently with a tkinter instance and all of the serial polling.
-I need the option to kill tasks.  This may take the form of including an exit condition, or by killing a tast forcefully.
+I need the option to kill tasks.  This may take the form of including an exit condition, or by killing a task forcefully.
 
 Multithreading vs. Multiprocessing:
 Killing a thread is messy and unsupported, while killing a process is at least supported

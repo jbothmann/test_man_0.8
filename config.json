@@ -1,7 +1,8 @@
 {
 	"url": "http://localhost:5000/",
 	"addAll": true,
-	"port": "COM7",
+	"comport": "COM7",
+	"netport": 5000,
 	"file": ["C:/Users/np0083/Documents/GitHub/test_man_0.8/demo 4.json"],
 	"lock": false,
 	"pass": "hello",

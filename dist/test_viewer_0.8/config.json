@@ -1,11 +1,7 @@
 {
-	"url": "http://localhost:5000/",
+	"url": "http://10.0.53.68:5000/",
 	"addAll": true,
-	"port": null,
-	"file": ["C:/Users/np0083/Documents/GitHub/test_man_0.8/demo 4.json"],
-	"lock": false,
-	"pass": "hello",
-	"theme": "Night",
+	"theme": "Default Gray",
 	"fontFamily": "Segoe UI",
 	"fontSize": 9
 }

@@ -1868,7 +1868,7 @@ class Server():
                     }for oo in stationToServe.data],
                 "controls": [{
                     "name": oo[0],
-                    "data": oo[1]
+                    "bool": oo[1]
                     }for oo in stationToServe.controls]
                 })
         flask.abort(404)

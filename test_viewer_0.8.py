@@ -190,7 +190,7 @@ class Test:
         if self.online:
             self.connectionHint.config(text="")
         else:
-            self.connectionHint.config(text="No Connection")
+            self.connectionHint.config(text="No Connection") #TODO: doesn't work
 
         #reconfigure the minimum size of the main window
         root.update_idletasks()
@@ -267,8 +267,8 @@ class Test:
                     if isinstance(oo["bool"], bool):
                         self.controls[-1][1] = oo["bool"] #set control status, boolean
 
-                elif isinstance(controls[-1], str):
-                    self.controls[-1][0] = oo #set control label if only a string name is given 
+            elif isinstance(oo, str):
+                self.controls[-1][0] = oo #set control label if only a string name is given 
 
     def setOnline(self):
         if not self.online:
@@ -814,6 +814,8 @@ class Polling:
 
                 except Exception as e:
                     tests[self.currTestPoll].setOffline()
+                else:
+                    tests[self.currTestPoll].setOnline()
                 self.currTestPoll += 1
             if self.currTestPoll >= len(tests): #reset poll index to zero
                 self.currTestPoll = 0
